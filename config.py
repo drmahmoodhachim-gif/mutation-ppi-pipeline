@@ -52,7 +52,15 @@ PROTEIN_PDB = {
     "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5 cardiac sodium channel
     "KCNQ1": ["6UZZ"],
     "MYH7": ["4DB1"],
+    "VCL": ["1SDR", "1SYQ"],  # Vinculin structures
 }
+
+# Example variants for quick selection
+EXAMPLE_VARIANTS = [
+    {"gene": "SCN5A", "mutation": "c.1577G>A, p.R526H", "label": "SCN5A p.R526H — literature (phosphorylation site, PMID: 24795344)"},
+    {"gene": "SCN5A", "mutation": "c.3160T>G, p.Ser1054Ala", "label": "SCN5A p.Ser1054Ala — cohort (disordered region, predicted phosphosite)"},
+    {"gene": "VCL", "mutation": "c.2507A>G, p.Gln836Arg", "label": "VCL p.Gln836Arg — cohort (vinculin linker region)"},
+]
 
 # AlphaMissense API
 ALPHAMISSENSE_API = "https://alphamissense.hegelab.org/hotspotapi"
