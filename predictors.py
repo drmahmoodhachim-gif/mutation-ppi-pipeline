@@ -132,7 +132,7 @@ def get_ppi_ddg_predictions(gene: str, interactors: list, wt_aa: str, pos: int, 
         partner = ip.get("partner", "")
         complex_info = PPI_PDB_COMPLEXES.get((gene.upper(), partner))
         low, high = (0, 0)
-        if complex_info and isinstance(complex_info.get("uniprot_range"), (list, tuple)) and len(complex_info["uniprot_range"]) >= 2:
+        if complex_info and isinstance(complex_info.get("uniprot_range"), (list, tuple)) and len(complex_info.get("uniprot_range", [])) >= 2:
             low, high = complex_info["uniprot_range"][0], complex_info["uniprot_range"][1]
         in_range = complex_info and low <= pos <= high
         ddg = _heuristic_ddg(wt_aa, mut_aa)

@@ -50,20 +50,35 @@ st.markdown(
     '<p class="sub-header">Predict pathogenicity, structural impact, and protein-protein interactions for missense mutations in tissue context</p>',
     unsafe_allow_html=True,
 )
+st.markdown("**Hi Inna Aleksandrova** · مرحباً إينا ألكساندروفا · Привет, Инна Александрова")
+st.divider()
 
 # Sidebar — Input
 with st.sidebar:
     st.header("📥 Input")
-    gene = st.text_input("Gene symbol", value="SCN5A", help="e.g., SCN5A, MYH7, KCNQ1")
+    example_options = ["Custom (enter below)"] + [v["label"] for v in EXAMPLE_VARIANTS]
+    example_choice = st.selectbox("Example variant", example_options, index=0)
+    if example_choice != "Custom (enter below)":
+        ex = next(v for v in EXAMPLE_VARIANTS if v["label"] == example_choice)
+        gene_default, mutation_default = ex["gene"], ex["mutation"]
+    else:
+        gene_default, mutation_default = "SCN5A", "c.1577G>A, p.R526H"
+    gene = st.text_input("Gene symbol", value=gene_default, help="e.g., SCN5A, MYH7, KCNQ1, VCL")
     mutation_input = st.text_input(
         "Mutation",
-        value="c.1577G>A, p.R526H",
+        value=mutation_default,
         help="Formats: c.1577G>A, p.R526H, or R526H",
     )
     tissue = st.selectbox(
         "Tissue of interest",
         ["Cardiac myocyte", "Heart", "Skeletal muscle", "Neuron", "Other"],
         index=0,
+    )
+    conclusion_input = st.selectbox(
+        "Conclusion",
+        ["Decreased", "Increased", "No change"],
+        index=0,
+        help="Binding alteration: Decreased (weaker), Increased (stronger), or No change",
     )
     run_button = st.button("🚀 Run Pipeline", type="primary", use_container_width=True)
 
@@ -127,13 +142,42 @@ if run_button or st.session_state.get("results_ready"):
         if in_voltage_sensor:
             st.info("Position likely in DII voltage-sensor region — charge changes can severely affect gating.")
 
-        # --- Section 4: Tissue-specific PPIs ---
-        st.header("4️⃣ Tissue-Specific Protein Interactions")
+        # --- Section 4: Tissue-specific PPIs + PPI ΔΔG table ---
+        st.header("4️⃣ Tissue-Specific Protein Interactions & PPI ΔΔG")
         interactors = get_tissue_interactors(gene, tissue)
-        if interactors:
+        if interactors and wt and mut and pos:
+            ddg_results = get_ppi_ddg_predictions(gene, interactors, wt, pos, mut)
+            table_data = []
+            for r in ddg_results:
+                ddg = r["mutant_ddg"]
+                pathway = "Weaker binding may reduce downstream coupling/signaling" if conclusion_input == "Decreased" else "Stronger binding may enhance downstream effects" if conclusion_input == "Increased" else "Similar affinity; minimal pathway impact"
+                role = r.get("role", "").lower()
+                if "na+" in role or "sodium" in role:
+                    pathway = "May alter late Na+ current and excitability"
+                elif "inactivation" in role or "iq" in role:
+                    pathway = "May affect channel inactivation kinetics"
+                elif "trafficking" in role:
+                    pathway = "May impair membrane trafficking"
+                elif "talin" in role or "actin" in role or "focal" in role:
+                    pathway = "May affect focal adhesion dynamics"
+                elif "iks" in role or "modulation" in role:
+                    pathway = "May alter IKs channel modulation"
+                table_data.append({
+                    "Interacting protein": r["partner"],
+                    "Role": r["role"],
+                    "Wild-type (ref)": "0",
+                    "Mutant ΔΔG (kcal/mol)": ddg,
+                    "Conclusion": conclusion_input,
+                    "Pathway effect downstream": pathway,
+                })
+            df = pd.DataFrame(table_data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.caption("ΔΔG calculated immediately (heuristic). Conclusion from input selection.")
+        elif interactors:
             for ip in interactors:
                 with st.expander(f"**{ip['partner']}** — {ip['role']}"):
                     st.write(f"UniProt: {ip['uniprot']}")
+            st.info("Provide mutation in p.R526H format for ΔΔG table.")
         else:
             st.info(f"No predefined interactors for {gene} in {tissue}. Add to config.CARDIAC_MYOCYTE_INTERACTORS.")
 
