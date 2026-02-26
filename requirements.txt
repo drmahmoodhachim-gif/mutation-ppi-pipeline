@@ -1,6 +1,11 @@
-# Mutation PPI Prediction Pipeline (Streamlit Cloud compatible)
-streamlit>=1.28.0,<2.0.0
+# Mutation PPI Prediction Pipeline
+streamlit>=1.28.0
 py3Dmol>=2.0.0
+stmol>=0.0.9
 requests>=2.31.0
 pandas>=2.0.0
 biopython>=1.81
+python-dotenv>=1.0.0
+
+# Optional: for local ColabFold (uncomment if using)
+# colabfold[alphafold]>=1.5.0

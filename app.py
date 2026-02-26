@@ -13,7 +13,7 @@ from predictors import (
     estimate_structural_impact,
     resolve_uniprot,
 )
-from visualization import fetch_pdb, render_py3dmol_html
+from visualization import fetch_pdb, create_mol_viewer
 
 # Page config
 st.set_page_config(
@@ -149,17 +149,8 @@ if run_button or st.session_state.get("results_ready"):
         else:
             st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB or use AlphaFold DB.")
 
-        # --- Section 6: Next steps / mCSM-PPI2 ---
-        st.header("6️⃣ PPI Binding Affinity (mCSM-PPI2)")
-        st.markdown("""
-        For interface residues, use **mCSM-PPI2** to predict ΔΔG:
-        - [mCSM-PPI2 Web Server](https://biosig.lab.uq.edu.au/mcsm_ppi2/)
-        - Upload your PDB complex and mutation (e.g., `A R 526 H`)
-        - R526 is in the voltage sensor; PPI tools apply if you identify an interface involving this residue.
-        """)
-        st.link_button("Open mCSM-PPI2", "https://biosig.lab.uq.edu.au/mcsm_ppi2/submit_prediction")
-
     st.success("✅ Pipeline complete.")
+    st.info("👉 For interface residues, go to **mCSM-PPI2** (sidebar) to predict ΔΔG.")
 
 else:
     st.info("👈 Enter mutation and tissue, then click **Run Pipeline** to start.")
