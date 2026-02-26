@@ -45,6 +45,14 @@ def parse_mutation(mutation_input: str) -> dict:
     return result
 
 
+def _parse_alphamissense_categories(raw: str) -> set:
+    """Parse '6:C,G,H,L,P,S' -> {'C','G','H','L','P','S'}."""
+    if not raw or not isinstance(raw, str):
+        return set()
+    part = raw.split(":", 1)[-1].strip() if ":" in raw else raw
+    return {a.strip().upper() for a in part.split(",") if a.strip()}
+
+
 def get_alphamissense_prediction(gene: str, position: int, wt_aa: str, mut_aa: str) -> dict:
     """Fetch AlphaMissense pathogenicity prediction via REST API."""
     uniprot_id = GENE_UNIPROT.get(gene.upper())
@@ -53,18 +61,30 @@ def get_alphamissense_prediction(gene: str, position: int, wt_aa: str, mut_aa: s
 
     url = f"{ALPHAMISSENSE_API}?uid={uniprot_id}&resi={position}"
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(url, timeout=20)
         r.raise_for_status()
         data = r.json()
-        # API returns all substitutions; find our mutation
-        if isinstance(data, dict) and "score" in data:
-            return {"pathogenicity": data.get("score", 0), "raw": data}
-        if isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict) and str(item.get("aa", "")) == mut_aa:
-                    return {"pathogenicity": item.get("score", 0), "raw": item}
-        return {"pathogenicity": None, "raw": data, "note": "Mutation not found in response"}
-    except Exception as e:
+        if not isinstance(data, dict):
+            return {"pathogenicity": None, "raw": data, "error": "Unexpected API response"}
+
+        mut = mut_aa.upper()
+        # API returns benign/pathogenic/ambiguous per residue (e.g. "6:C,G,H,L,P,S")
+        benign = _parse_alphamissense_categories(data.get("benign", ""))
+        pathogenic = _parse_alphamissense_categories(data.get("pathogenic", ""))
+        ambiguous = _parse_alphamissense_categories(data.get("ambiguous", ""))
+
+        if mut in pathogenic:
+            score = 0.9
+        elif mut in ambiguous:
+            score = 0.5
+        elif mut in benign:
+            score = 0.15
+        else:
+            mean = data.get("mean_all") or data.get("mean")
+            score = float(mean) if mean is not None else 0.5
+
+        return {"pathogenicity": score, "raw": data}
+    except requests.RequestException as e:
         return {"error": str(e), "url": url}
 
 

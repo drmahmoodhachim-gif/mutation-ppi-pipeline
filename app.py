@@ -94,7 +94,8 @@ if run_button or st.session_state.get("results_ready"):
             am_result = get_alphamissense_prediction(gene, pos, wt, mut)
             if "error" in am_result:
                 st.warning(f"AlphaMissense API: {am_result['error']}")
-                st.info("You can check manually: https://alphamissense.hegelab.org/")
+                manual_url = f"https://alphamissense.hegelab.org/hotspot?uid={uniprot_id}&resi={pos}" if uniprot_id else "https://alphamissense.hegelab.org/"
+                st.link_button("Open AlphaMissense manually", manual_url)
             else:
                 score = am_result.get("pathogenicity")
                 if score is not None:
@@ -149,8 +150,17 @@ if run_button or st.session_state.get("results_ready"):
         else:
             st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB or use AlphaFold DB.")
 
+        # --- Section 6: Next steps / mCSM-PPI2 ---
+        st.header("6️⃣ PPI Binding Affinity (mCSM-PPI2)")
+        st.markdown("""
+        For interface residues, use **mCSM-PPI2** to predict ΔΔG:
+        - [mCSM-PPI2 Web Server](https://biosig.lab.uq.edu.au/mcsm_ppi2/)
+        - Upload your PDB complex and mutation (e.g., `A R 526 H`)
+        - R526 is in the voltage sensor; PPI tools apply if you identify an interface involving this residue.
+        """)
+        st.link_button("Open mCSM-PPI2", "https://biosig.lab.uq.edu.au/mcsm_ppi2/submit_prediction")
+
     st.success("✅ Pipeline complete.")
-    st.info("👉 For interface residues, go to **mCSM-PPI2** (sidebar) to predict ΔΔG.")
 
 else:
     st.info("👈 Enter mutation and tissue, then click **Run Pipeline** to start.")
