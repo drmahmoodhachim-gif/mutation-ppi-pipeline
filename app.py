@@ -12,6 +12,7 @@ from predictors import (
     get_recommended_pdb,
     estimate_structural_impact,
     resolve_uniprot,
+    get_ppi_ddg_predictions,
 )
 from visualization import fetch_pdb, render_py3dmol_html
 
@@ -40,6 +41,8 @@ st.markdown(
     '<p class="sub-header">Predict pathogenicity, structural impact, and protein-protein interactions for missense mutations in tissue context</p>',
     unsafe_allow_html=True,
 )
+st.markdown("**Hi Inna Aleksandrova** · مرحباً إينا ألكساندروفا · Привет, Инна Александрова")
+st.divider()
 
 # Sidebar — Input
 with st.sidebar:
