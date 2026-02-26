@@ -8,6 +8,7 @@ from config import (
     CARDIAC_MYOCYTE_INTERACTORS,
     DEFAULT_INTERACTORS,
     PROTEIN_PDB,
+    PPI_PDB_COMPLEXES,
     ALPHAMISSENSE_API,
 )
 
@@ -45,14 +46,6 @@ def parse_mutation(mutation_input: str) -> dict:
     return result
 
 
-def _parse_alphamissense_categories(raw: str) -> set:
-    """Parse '6:C,G,H,L,P,S' -> {'C','G','H','L','P','S'}."""
-    if not raw or not isinstance(raw, str):
-        return set()
-    part = raw.split(":", 1)[-1].strip() if ":" in raw else raw
-    return {a.strip().upper() for a in part.split(",") if a.strip()}
-
-
 def get_alphamissense_prediction(gene: str, position: int, wt_aa: str, mut_aa: str) -> dict:
     """Fetch AlphaMissense pathogenicity prediction via REST API."""
     uniprot_id = GENE_UNIPROT.get(gene.upper())
@@ -61,30 +54,18 @@ def get_alphamissense_prediction(gene: str, position: int, wt_aa: str, mut_aa: s
 
     url = f"{ALPHAMISSENSE_API}?uid={uniprot_id}&resi={position}"
     try:
-        r = requests.get(url, timeout=20)
+        r = requests.get(url, timeout=15)
         r.raise_for_status()
         data = r.json()
-        if not isinstance(data, dict):
-            return {"pathogenicity": None, "raw": data, "error": "Unexpected API response"}
-
-        mut = mut_aa.upper()
-        # API returns benign/pathogenic/ambiguous per residue (e.g. "6:C,G,H,L,P,S")
-        benign = _parse_alphamissense_categories(data.get("benign", ""))
-        pathogenic = _parse_alphamissense_categories(data.get("pathogenic", ""))
-        ambiguous = _parse_alphamissense_categories(data.get("ambiguous", ""))
-
-        if mut in pathogenic:
-            score = 0.9
-        elif mut in ambiguous:
-            score = 0.5
-        elif mut in benign:
-            score = 0.15
-        else:
-            mean = data.get("mean_all") or data.get("mean")
-            score = float(mean) if mean is not None else 0.5
-
-        return {"pathogenicity": score, "raw": data}
-    except requests.RequestException as e:
+        # API returns all substitutions; find our mutation
+        if isinstance(data, dict) and "score" in data:
+            return {"pathogenicity": data.get("score", 0), "raw": data}
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict) and str(item.get("aa", "")) == mut_aa:
+                    return {"pathogenicity": item.get("score", 0), "raw": item}
+        return {"pathogenicity": None, "raw": data, "note": "Mutation not found in response"}
+    except Exception as e:
         return {"error": str(e), "url": url}
 
 
@@ -155,3 +136,39 @@ def estimate_structural_impact(wt_aa: str, mut_aa: str, position: int, in_voltag
         reasons.append("Conservative substitution")
 
     return {"impact": impact, "reasons": reasons}
+def _heuristic_ddg(wt_aa: str, mut_aa: str) -> float:
+    """Heuristic ΔΔG (kcal/mol) for binding."""
+    charge = {"R": 1, "K": 1, "D": -1, "E": -1, "H": 0.5}
+    hydro = {"A": 1.8, "R": -4.5, "N": -3.5, "D": -3.5, "C": 2.5, "E": -3.5, "H": -3.2,
+             "I": 4.5, "L": 3.8, "K": -3.9, "M": 1.9, "F": 2.8, "P": -1.6, "S": -0.8,
+             "T": -0.7, "W": -0.9, "Y": -1.3, "V": 4.2, "G": -0.4, "Q": -3.5}
+    dc = abs(charge.get(wt_aa, 0) - charge.get(mut_aa, 0))
+    dh = abs(hydro.get(wt_aa, 0) - hydro.get(mut_aa, 0))
+    ddg = 0
+    if dc >= 0.5:
+        ddg -= 1.5
+    if dh > 2:
+        ddg -= 0.8
+    return round(ddg, 1)
+
+
+def get_ppi_ddg_predictions(gene: str, interactors: list, wt_aa: str, pos: int, mut_aa: str) -> list:
+    """Get ΔΔG (wild vs mutant) for each known PPI."""
+    results = []
+    for ip in interactors:
+        partner = ip.get("partner", "")
+        key = (gene.upper(), partner)
+        complex_info = PPI_PDB_COMPLEXES.get(key)
+        low, high = (complex_info["uniprot_range"]) if complex_info else (0, 0)
+        in_range = complex_info and low <= pos <= high
+        ddg = _heuristic_ddg(wt_aa, mut_aa)
+        results.append({
+            "partner": partner,
+            "role": ip.get("role", ""),
+            "uniprot": ip.get("uniprot", ""),
+            "mutant_ddg": ddg,
+            "method": "heuristic",
+            "in_interface": in_range,
+        })
+    return results
+

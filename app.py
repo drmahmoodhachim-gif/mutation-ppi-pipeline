@@ -13,7 +13,7 @@ from predictors import (
     estimate_structural_impact,
     resolve_uniprot,
 )
-from visualization import fetch_pdb, render_py3dmol_html
+from visualization import fetch_pdb, create_mol_viewer
 
 # Page config
 st.set_page_config(
@@ -40,13 +40,6 @@ st.markdown(
     '<p class="sub-header">Predict pathogenicity, structural impact, and protein-protein interactions for missense mutations in tissue context</p>',
     unsafe_allow_html=True,
 )
-
-# Welcome — Inna Aleksandrova (Arabic, English, Russian)
-st.markdown("""
-<div style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border-left: 5px solid #1E88E5;">
-<p style="margin: 0; font-size: 1.1rem; font-weight: 600;">👋 <strong>Hi Inna Aleksandrova</strong> | مرحباً إينا ألكساندروفا | Привет, Инна Александрова</p>
-</div>
-""", unsafe_allow_html=True)
 
 # Sidebar — Input
 with st.sidebar:
@@ -165,15 +158,24 @@ if run_button or st.session_state.get("results_ready"):
         else:
             st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB or use AlphaFold DB.")
 
-        # --- Section 6: Next steps / mCSM-PPI2 ---
-        st.header("6️⃣ PPI Binding Affinity (mCSM-PPI2)")
-        st.markdown("""
-        For interface residues, use **mCSM-PPI2** to predict ΔΔG:
-        - [mCSM-PPI2 Web Server](https://biosig.lab.uq.edu.au/mcsm_ppi2/)
-        - Upload your PDB complex and mutation (e.g., `A R 526 H`)
-        - R526 is in the voltage sensor; PPI tools apply if you identify an interface involving this residue.
-        """)
-        st.link_button("Open mCSM-PPI2", "https://biosig.lab.uq.edu.au/mcsm_ppi2/submit_prediction")
+        # --- Section 6: PPI Binding Affinity — Wild vs Mutant ---
+        st.header("6️⃣ PPI Binding Affinity (Wild vs Mutant)")
+        interactors = get_tissue_interactors(gene, tissue)
+        if interactors and pos and wt and mut:
+            ddg_results = get_ppi_ddg_predictions(gene, interactors, wt, pos, mut)
+            st.markdown(f"**ΔΔG** = change in binding affinity (negative = weaker binding). **Wild-type** reference = 0.")
+            for r in ddg_results:
+                ddg = r["mutant_ddg"]
+                ddg_str = f"{ddg:+.1f}" if ddg != 0 else "0"
+                interp = "Weaker" if ddg < 0 else ("Stronger" if ddg > 0 else "Similar")
+                with st.expander(f"**{r['partner']}** — {r['role']} | ΔΔG = {ddg_str} kcal/mol ({interp})"):
+                    st.write(f"**UniProt:** {r['uniprot']}")
+                    st.write(f"Wild-type: reference | Mutant {wt}{pos}→{mut}: {ddg_str} kcal/mol")
+                    st.caption(f"Method: {r['method']}" + (" | Residue in complex" if r["in_interface"] else " | Heuristic (residue not in known complex)"))
+            st.markdown("For accurate predictions, use **mCSM-PPI2** with your PDB complex:")
+            st.link_button("Open mCSM-PPI2", "https://biosig.lab.uq.edu.au/mcsm_ppi2/submit_prediction")
+        else:
+            st.info(f"No predefined interactors for {gene} in {tissue}, or mutation format needed. Add to config.")
 
     st.success("✅ Pipeline complete.")
 
