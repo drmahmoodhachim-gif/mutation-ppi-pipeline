@@ -39,6 +39,9 @@ DEFAULT_INTERACTORS = {
     "FGF13": "Q92913",
 }
 
+# PDB complexes for PPI structure-based predictions (gene_pair -> pdb_id)
+PPI_PDB_COMPLEXES = {}
+
 # Known PDB structures for key proteins
 PROTEIN_PDB = {
     "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5 cardiac sodium channel
