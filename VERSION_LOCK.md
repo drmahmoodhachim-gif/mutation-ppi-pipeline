@@ -1,6 +1,14 @@
 # LOCKED VERSION — Mutation PPI Pipeline
 
-**Do not revert these files to older versions.** This document locks the functional state.
+## 🔒 PERFECT WORKING VERSION — NEVER EVER CHANGE
+
+**Commit:** `aa8f251`  
+**Tag:** `v1.0-perfect` (if created)  
+**Date locked:** 2026-02-27
+
+**This version is perfect. Do not modify app.py, config.py, predictors.py, or visualization.py.**
+
+---
 
 ## Critical rules (DO NOT CHANGE)
 
@@ -39,8 +47,13 @@
 - VCL (Vinculin) in config
 - mCSM-PPI2 link for manual predictions
 
-## Before making changes
+## DO NOT CHANGE — This script works perfectly
 
-1. Run: `streamlit run app.py`
-2. Verify: no NameError, welcome shows, 3D works, PPI ΔΔG shows
-3. Do NOT change the visualization import
+- Example variant dropdown (SCN5A p.R526H, p.Ser1054Ala, VCL p.Gln836Arg)
+- Conclusion dropdown (Decreased / Increased / No change)
+- PPI ΔΔG table with Interacting protein, Role, Wild-type, Mutant ΔΔG, Conclusion, Pathway effect
+- 3-letter mutation parsing (p.Ser1054Ala, p.Gln836Arg)
+
+## Recovery
+
+If broken: `git checkout aa8f251` or `git checkout v1.0-perfect` to restore this perfect version.
