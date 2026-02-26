@@ -11,7 +11,7 @@ An **interactive pipeline** that takes a **mutation** (e.g., SCN5A c.1577G>A, p.
 ## Quick start (local)
 
 ```bash
-git clone https://github.com/drmahmoodhachim-gif/mutation-ppi-pipeline.git
+git clone https://github.com/YOUR_USERNAME/mutation-ppi-pipeline.git
 cd mutation-ppi-pipeline
 pip install -r requirements.txt
 streamlit run app.py
