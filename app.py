@@ -13,7 +13,7 @@ from predictors import (
     estimate_structural_impact,
     resolve_uniprot,
 )
-from visualization import fetch_pdb, create_mol_viewer
+from visualization import fetch_pdb, render_py3dmol_html
 
 # Page config
 st.set_page_config(

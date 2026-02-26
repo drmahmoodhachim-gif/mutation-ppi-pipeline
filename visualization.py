@@ -15,7 +15,7 @@ def fetch_pdb(pdb_id: str) -> Optional[str]:
     """Fetch PDB structure from RCSB."""
     url = f"https://files.rcsb.org/view/{pdb_id}.pdb"
     try:
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, timeout=30)
         if r.ok:
             return r.text
     except Exception:
