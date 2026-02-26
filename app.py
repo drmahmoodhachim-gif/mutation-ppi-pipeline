@@ -5,7 +5,15 @@ Input: gene, mutation, tissue → outputs all predictions + high-res 3D visualiz
 
 import streamlit as st
 import pandas as pd
-from config import GENE_UNIPROT, PROTEIN_PDB, EXAMPLE_VARIANTS
+from config import GENE_UNIPROT, PROTEIN_PDB
+try:
+    from config import EXAMPLE_VARIANTS
+except ImportError:
+    EXAMPLE_VARIANTS = [
+        {"gene": "SCN5A", "mutation": "c.1577G>A, p.R526H", "label": "SCN5A p.R526H — literature (PMID: 24795344)"},
+        {"gene": "SCN5A", "mutation": "c.3160T>G, p.Ser1054Ala", "label": "SCN5A p.Ser1054Ala — cohort"},
+        {"gene": "VCL", "mutation": "c.2507A>G, p.Gln836Arg", "label": "VCL p.Gln836Arg — cohort"},
+    ]
 from predictors import (
     parse_mutation,
     get_alphamissense_prediction,

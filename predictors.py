@@ -109,6 +109,44 @@ def get_recommended_pdb(gene: str) -> list:
     return PROTEIN_PDB.get(gene.upper(), [])
 
 
+def _heuristic_ddg(wt_aa: str, mut_aa: str) -> float:
+    """Heuristic ΔΔG (kcal/mol) for binding."""
+    charge = {"R": 1, "K": 1, "D": -1, "E": -1, "H": 0.5}
+    hydro = {"A": 1.8, "R": -4.5, "N": -3.5, "D": -3.5, "C": 2.5, "E": -3.5, "H": -3.2,
+             "I": 4.5, "L": 3.8, "K": -3.9, "M": 1.9, "F": 2.8, "P": -1.6, "S": -0.8,
+             "T": -0.7, "W": -0.9, "Y": -1.3, "V": 4.2, "G": -0.4, "Q": -3.5}
+    dc = abs(charge.get(wt_aa, 0) - charge.get(mut_aa, 0))
+    dh = abs(hydro.get(wt_aa, 0) - hydro.get(mut_aa, 0))
+    ddg = 0
+    if dc > 0.5:
+        ddg -= 1.5
+    if dh > 2:
+        ddg -= 0.8
+    return round(ddg, 1)
+
+
+def get_ppi_ddg_predictions(gene: str, interactors: list, wt_aa: str, pos: int, mut_aa: str) -> list:
+    """Get ΔΔG (wild vs mutant) for each known PPI."""
+    results = []
+    for ip in interactors:
+        partner = ip.get("partner", "")
+        complex_info = PPI_PDB_COMPLEXES.get((gene.upper(), partner))
+        low, high = (0, 0)
+        if complex_info and isinstance(complex_info.get("uniprot_range"), (list, tuple)) and len(complex_info["uniprot_range"]) >= 2:
+            low, high = complex_info["uniprot_range"][0], complex_info["uniprot_range"][1]
+        in_range = complex_info and low <= pos <= high
+        ddg = _heuristic_ddg(wt_aa, mut_aa)
+        results.append({
+            "partner": partner,
+            "role": ip.get("role", ""),
+            "uniprot": ip.get("uniprot", ""),
+            "mutant_ddg": ddg,
+            "method": "heuristic",
+            "in_interface": in_range,
+        })
+    return results
+
+
 def estimate_structural_impact(wt_aa: str, mut_aa: str, position: int, in_voltage_sensor: bool = False) -> dict:
     """
     Heuristic for structural impact based on physicochemical properties.
