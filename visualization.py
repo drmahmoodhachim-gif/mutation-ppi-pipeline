@@ -15,12 +15,24 @@ def fetch_pdb(pdb_id: str) -> Optional[str]:
     """Fetch PDB structure from RCSB."""
     url = f"https://files.rcsb.org/view/{pdb_id}.pdb"
     try:
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, timeout=30)
         if r.ok:
             return r.text
     except Exception:
         pass
     return None
+
+
+def _extract_chain(pdb_data: str, chain: str) -> str:
+    """Extract only specified chain from PDB for lighter 3D rendering."""
+    out = []
+    for line in pdb_data.split("\n"):
+        if line.startswith(("ATOM", "HETATM")):
+            if len(line) >= 22 and line[21:22].strip() == chain:
+                out.append(line)
+        else:
+            out.append(line)
+    return "\n".join(out) if out else pdb_data
 
 
 def create_mol_viewer(
@@ -64,38 +76,15 @@ def render_stmol(pdb_data: str, residue_pos: Optional[int] = None, height: int =
         st.warning(f"3D viewer unavailable: {e}. Install: pip install stmol py3Dmol")
 
 
-def render_py3dmol_html(
-    pdb_data: str,
-    residue_pos: Optional[int] = None,
-    chain: Optional[str] = None,
-    width: int = 800,
-    height: int = 600,
-) -> str:
+def render_py3dmol_html(pdb_data: str, residue_pos: Optional[int] = None, width: int = 800, height: int = 600) -> str:
     """Generate embeddable HTML for py3Dmol 3D structure viewer."""
     if not HAS_PY3DMOL or not pdb_data:
         return ""
     view = py3Dmol.view(width=width, height=height)
     view.addModel(pdb_data, "pdb")
-    view.setStyle({"cartoon": {"colorscheme": "spectrum", "opacity": 0.9}})
+    view.setStyle({"cartoon": {"colorscheme": "spectrum"}})
     if residue_pos is not None:
-        selector = {"resi": str(residue_pos)}
-        if chain:
-            selector["chain"] = chain
-        # Bright red stick + sphere + cartoon so mutant stands out clearly
-        view.setStyle(
-            selector,
-            {
-                "stick": {"color": "red"},
-                "sphere": {"scale": 0.5, "color": "red"},
-                "cartoon": {"color": "red"},
-            },
-        )
-        view.addLabel(
-            f"Mutant {residue_pos}",
-            {"fontColor": "white", "fontSize": 16, "backgroundColor": "red"},
-            selector,
-        )
-        view.zoomTo(selector)
-    else:
-        view.zoomTo()
+        view.setStyle({"resi": str(residue_pos)}, {"stick": {"colorscheme": "whiteCarbon"}, "cartoon": {"color": "red"}})
+        view.addLabel(f"Mutant {residue_pos}", {"fontColor": "black", "fontSize": 12, "backgroundColor": "white"}, {"resi": str(residue_pos)})
+    view.zoomTo()
     return view.write_html()
