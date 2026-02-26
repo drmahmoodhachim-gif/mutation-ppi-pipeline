@@ -74,12 +74,6 @@ with st.sidebar:
         ["Cardiac myocyte", "Heart", "Skeletal muscle", "Neuron", "Other"],
         index=0,
     )
-    conclusion_input = st.selectbox(
-        "Conclusion",
-        ["Decreased", "Increased", "No change"],
-        index=0,
-        help="Binding alteration: Decreased (weaker), Increased (stronger), or No change",
-    )
     run_button = st.button("🚀 Run Pipeline", type="primary", use_container_width=True)
 
 # Parse mutation
@@ -172,7 +166,7 @@ if run_button or st.session_state.get("results_ready"):
                 })
             df = pd.DataFrame(table_data)
             st.dataframe(df, use_container_width=True, hide_index=True)
-            st.caption("ΔΔG calculated immediately (heuristic). Conclusion from input selection.")
+            st.caption("ΔΔG calculated immediately (heuristic). Conclusion derived from ΔΔG.")
         elif interactors:
             for ip in interactors:
                 with st.expander(f"**{ip['partner']}** — {ip['role']}"):
