@@ -11,7 +11,7 @@ An **interactive pipeline** that takes a **mutation** (e.g., SCN5A c.1577G>A, p.
 ## Quick start (local)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mutation-ppi-pipeline.git
+git clone https://github.com/drmahmoodhachim-gif/mutation-ppi-pipeline.git
 cd mutation-ppi-pipeline
 pip install -r requirements.txt
 streamlit run app.py
@@ -32,19 +32,6 @@ Then open the URL (usually http://localhost:8501) in your browser.
 6. Click **Deploy**
 
 Your app will be live at `https://YOUR_APP_NAME.streamlit.app`
-
-## Push to GitHub (first-time setup)
-
-```bash
-cd mutation-ppi-pipeline
-git init
-git add .
-git commit -m "Initial commit: Mutation PPI pipeline"
-git branch -M main
-# Create a new repo on github.com, then:
-git remote add origin https://github.com/YOUR_USERNAME/mutation-ppi-pipeline.git
-git push -u origin main
-```
 
 ## Input formats
 
