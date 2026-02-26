@@ -13,7 +13,7 @@ from predictors import (
     estimate_structural_impact,
     resolve_uniprot,
 )
-from visualization import fetch_pdb, create_mol_viewer
+from visualization import fetch_pdb, render_py3dmol_html
 
 # Page config
 st.set_page_config(
@@ -94,8 +94,7 @@ if run_button or st.session_state.get("results_ready"):
             am_result = get_alphamissense_prediction(gene, pos, wt, mut)
             if "error" in am_result:
                 st.warning(f"AlphaMissense API: {am_result['error']}")
-                manual_url = f"https://alphamissense.hegelab.org/hotspot?uid={uniprot_id}&resi={pos}" if uniprot_id else "https://alphamissense.hegelab.org/"
-                st.link_button("Open AlphaMissense manually", manual_url)
+                st.info("You can check manually: https://alphamissense.hegelab.org/")
             else:
                 score = am_result.get("pathogenicity")
                 if score is not None:
