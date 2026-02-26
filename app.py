@@ -12,7 +12,6 @@ from predictors import (
     get_recommended_pdb,
     estimate_structural_impact,
     resolve_uniprot,
-    get_ppi_ddg_predictions,
 )
 from visualization import fetch_pdb, render_py3dmol_html
 
@@ -43,14 +42,21 @@ st.markdown(
 )
 
 # Sidebar — Input
+EXAMPLE_VARIANTS = [
+    ("SCN5A c.1577G>A, p.R526H", "SCN5A", "c.1577G>A, p.R526H"),  # PMID: 24795344
+    ("SCN5A c.3160T>G, p.Ser1054Ala", "SCN5A", "c.3160T>G, p.Ser1054Ala"),
+    ("VCL c.2507A>G, p.Gln836Arg", "VCL", "c.2507A>G, p.Gln836Arg"),
+]
 with st.sidebar:
     st.header("📥 Input")
-    gene = st.text_input("Gene symbol", value="SCN5A", help="e.g., SCN5A, MYH7, KCNQ1")
-    mutation_input = st.text_input(
-        "Mutation",
-        value="c.1577G>A, p.R526H",
-        help="Formats: c.1577G>A, p.R526H, or R526H",
-    )
+    ex_choice = st.selectbox("Example variant", ["— Custom —"] + [e[0] for e in EXAMPLE_VARIANTS], key="ex_choice")
+    _ex = next((e for e in EXAMPLE_VARIANTS if e[0] == ex_choice), None)
+    _gene = _ex[1] if _ex else st.session_state.get("gene", "SCN5A")
+    _mut = _ex[2] if _ex else st.session_state.get("mutation", "c.1577G>A, p.R526H")
+    gene = st.text_input("Gene symbol", value=_gene, key="gene_input", help="e.g., SCN5A, MYH7, VCL")
+    mutation_input = st.text_input("Mutation", value=_mut, key="mutation_input", help="Formats: c.1577G>A, p.R526H, or R526H")
+    st.session_state["gene"] = gene
+    st.session_state["mutation"] = mutation_input
     tissue = st.selectbox(
         "Tissue of interest",
         ["Cardiac myocyte", "Heart", "Skeletal muscle", "Neuron", "Other"],
@@ -118,32 +124,13 @@ if run_button or st.session_state.get("results_ready"):
         if in_voltage_sensor:
             st.info("Position likely in DII voltage-sensor region — charge changes can severely affect gating.")
 
-        # --- Section 4: Tissue-specific PPIs + PPI ΔΔG (auto-calculated on selection) ---
-        st.header("4️⃣ Tissue-Specific Protein Interactions & PPI ΔΔG")
+        # --- Section 4: Tissue-specific PPIs ---
+        st.header("4️⃣ Tissue-Specific Protein Interactions")
         interactors = get_tissue_interactors(gene, tissue)
         if interactors:
-            partner_options = [f"{ip['partner']} — {ip['role']}" for ip in interactors]
-            selected_labels = st.multiselect(
-                "Select interacting proteins (ΔΔG calculated immediately)",
-                options=partner_options,
-                default=partner_options,
-                key="ppi_select",
-            )
-            selected_indices = [i for i, l in enumerate(partner_options) if l in selected_labels]
-            selected_interactors = [interactors[i] for i in selected_indices]
-            if selected_interactors and wt and mut and pos:
-                ddg_results = get_ppi_ddg_predictions(gene, selected_interactors, wt, pos, mut)
-                for r in ddg_results:
-                    ddg = r["mutant_ddg"]
-                    ddg_msg = f"ΔΔG ≈ **{ddg} kcal/mol**" + (" (weaker binding)" if ddg < 0 else " (similar binding)")
-                    with st.expander(f"**{r['partner']}** — {r['role']} · {ddg_msg}"):
-                        st.write(f"UniProt: {r['uniprot']}")
-                        st.caption(f"Heuristic method · negative ΔΔG = weaker mutant binding")
-            elif selected_interactors:
-                for ip in selected_interactors:
-                    with st.expander(f"**{ip['partner']}** — {ip['role']}"):
-                        st.write(f"UniProt: {ip['uniprot']}")
-                st.info("Provide mutation in p.R526H format for ΔΔG calculation.")
+            for ip in interactors:
+                with st.expander(f"**{ip['partner']}** — {ip['role']}"):
+                    st.write(f"UniProt: {ip['uniprot']}")
         else:
             st.info(f"No predefined interactors for {gene} in {tissue}. Add to config.CARDIAC_MYOCYTE_INTERACTORS.")
 
