@@ -47,6 +47,7 @@ PROTEIN_PDB = {
     "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5 cardiac sodium channel
     "KCNQ1": ["6UZZ"],
     "MYH7": ["4DB1"],
+    "VCL": ["1T01", "1ZW3", "1U6H"],  # Vinculin–talin complexes
 }
 
 # AlphaMissense API
