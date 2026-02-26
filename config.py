@@ -14,6 +14,7 @@ GENE_UNIPROT = {
     "CACNA1C": "Q13936",
     "FGF13": "Q92913",
     "CALM1": "P0DP23",
+    "VCL": "P18206",  # Vinculin
 }
 
 # Tissue-specific protein interactors for cardiac myocytes
@@ -43,6 +44,7 @@ PROTEIN_PDB = {
     "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5 cardiac sodium channel
     "KCNQ1": ["6UZZ"],
     "MYH7": ["4DB1"],
+    "VCL": ["1TR2", "1SYQ", "6B2N"],  # Vinculin
 }
 
 # AlphaMissense API
