@@ -64,15 +64,38 @@ def render_stmol(pdb_data: str, residue_pos: Optional[int] = None, height: int =
         st.warning(f"3D viewer unavailable: {e}. Install: pip install stmol py3Dmol")
 
 
-def render_py3dmol_html(pdb_data: str, residue_pos: Optional[int] = None, width: int = 800, height: int = 600) -> str:
+def render_py3dmol_html(
+    pdb_data: str,
+    residue_pos: Optional[int] = None,
+    chain: Optional[str] = None,
+    width: int = 800,
+    height: int = 600,
+) -> str:
     """Generate embeddable HTML for py3Dmol 3D structure viewer."""
     if not HAS_PY3DMOL or not pdb_data:
         return ""
     view = py3Dmol.view(width=width, height=height)
     view.addModel(pdb_data, "pdb")
-    view.setStyle({"cartoon": {"colorscheme": "spectrum"}})
+    view.setStyle({"cartoon": {"colorscheme": "spectrum", "opacity": 0.9}})
     if residue_pos is not None:
-        view.setStyle({"resi": str(residue_pos)}, {"stick": {"colorscheme": "whiteCarbon"}, "cartoon": {"color": "red"}})
-        view.addLabel(f"Mutant {residue_pos}", {"fontColor": "black", "fontSize": 12, "backgroundColor": "white"}, {"resi": str(residue_pos)})
-    view.zoomTo()
+        selector = {"resi": str(residue_pos)}
+        if chain:
+            selector["chain"] = chain
+        # Bright red stick + sphere + cartoon so mutant stands out clearly
+        view.setStyle(
+            selector,
+            {
+                "stick": {"color": "red"},
+                "sphere": {"scale": 0.5, "color": "red"},
+                "cartoon": {"color": "red"},
+            },
+        )
+        view.addLabel(
+            f"Mutant {residue_pos}",
+            {"fontColor": "white", "fontSize": 16, "backgroundColor": "red"},
+            selector,
+        )
+        view.zoomTo(selector)
+    else:
+        view.zoomTo()
     return view.write_html()
