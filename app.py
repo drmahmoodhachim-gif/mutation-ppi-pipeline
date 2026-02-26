@@ -12,7 +12,6 @@ from predictors import (
     get_recommended_pdb,
     estimate_structural_impact,
     resolve_uniprot,
-    get_ppi_ddg_predictions,
 )
 from visualization import fetch_pdb, render_py3dmol_html
 
@@ -41,8 +40,6 @@ st.markdown(
     '<p class="sub-header">Predict pathogenicity, structural impact, and protein-protein interactions for missense mutations in tissue context</p>',
     unsafe_allow_html=True,
 )
-st.markdown("**Hi Inna Aleksandrova** · مرحباً إينا ألكساندروفا · Привет, Инна Александрова")
-st.divider()
 
 # Sidebar — Input
 with st.sidebar:
@@ -120,32 +117,13 @@ if run_button or st.session_state.get("results_ready"):
         if in_voltage_sensor:
             st.info("Position likely in DII voltage-sensor region — charge changes can severely affect gating.")
 
-        # --- Section 4: Tissue-specific PPIs + PPI ΔΔG (auto-calculated on selection) ---
-        st.header("4️⃣ Tissue-Specific Protein Interactions & PPI ΔΔG")
+        # --- Section 4: Tissue-specific PPIs ---
+        st.header("4️⃣ Tissue-Specific Protein Interactions")
         interactors = get_tissue_interactors(gene, tissue)
         if interactors:
-            partner_options = [f"{ip['partner']} — {ip['role']}" for ip in interactors]
-            selected_labels = st.multiselect(
-                "Select interacting proteins (ΔΔG calculated immediately)",
-                options=partner_options,
-                default=partner_options,
-                key="ppi_select",
-            )
-            selected_indices = [i for i, l in enumerate(partner_options) if l in selected_labels]
-            selected_interactors = [interactors[i] for i in selected_indices]
-            if selected_interactors and wt and mut and pos:
-                ddg_results = get_ppi_ddg_predictions(gene, selected_interactors, wt, pos, mut)
-                for r in ddg_results:
-                    ddg = r["mutant_ddg"]
-                    ddg_msg = f"ΔΔG ≈ **{ddg} kcal/mol**" + (" (weaker binding)" if ddg < 0 else " (similar binding)")
-                    with st.expander(f"**{r['partner']}** — {r['role']} · {ddg_msg}"):
-                        st.write(f"UniProt: {r['uniprot']}")
-                        st.caption(f"Heuristic method · negative ΔΔG = weaker mutant binding")
-            elif selected_interactors:
-                for ip in selected_interactors:
-                    with st.expander(f"**{ip['partner']}** — {ip['role']}"):
-                        st.write(f"UniProt: {ip['uniprot']}")
-                st.info("Provide mutation in p.R526H format for ΔΔG calculation.")
+            for ip in interactors:
+                with st.expander(f"**{ip['partner']}** — {ip['role']}"):
+                    st.write(f"UniProt: {ip['uniprot']}")
         else:
             st.info(f"No predefined interactors for {gene} in {tissue}. Add to config.CARDIAC_MYOCYTE_INTERACTORS.")
 
