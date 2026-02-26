@@ -41,16 +41,9 @@ DEFAULT_INTERACTORS = {
 
 # Known PDB structures for key proteins
 PROTEIN_PDB = {
-    "SCN5A": ["6UZ3", "6UZ0", "8BEI"],
+    "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5 cardiac sodium channel
     "KCNQ1": ["6UZZ"],
     "MYH7": ["4DB1"],
-    "VCL": ["1TR2", "1SYQ"],
-}
-
-# PPI complexes for ΔΔG (gene+partner -> PDB, residue range in UniProt)
-PPI_PDB_COMPLEXES = {
-    ("SCN5A", "FGF13"): {"pdb": "4DCK", "chain": "A", "uniprot_range": (1773, 2016)},
-    ("SCN5A", "Calmodulin"): {"pdb": "4DCK", "chain": "A", "uniprot_range": (1773, 2016)},
 }
 
 # AlphaMissense API
