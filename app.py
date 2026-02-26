@@ -13,7 +13,7 @@ from predictors import (
     estimate_structural_impact,
     resolve_uniprot,
 )
-from visualization import fetch_pdb, render_py3dmol_html
+from visualization import fetch_pdb, create_mol_viewer
 
 # Page config
 st.set_page_config(
@@ -40,6 +40,13 @@ st.markdown(
     '<p class="sub-header">Predict pathogenicity, structural impact, and protein-protein interactions for missense mutations in tissue context</p>',
     unsafe_allow_html=True,
 )
+
+# Welcome — Inna Aleksandrova (Arabic, English, Russian)
+st.markdown("""
+<div style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border-left: 5px solid #1E88E5;">
+<p style="margin: 0; font-size: 1.1rem; font-weight: 600;">👋 <strong>Hi Inna Aleksandrova</strong> | مرحباً إينا ألكساندروفا | Привет, Инна Александрова</p>
+</div>
+""", unsafe_allow_html=True)
 
 # Sidebar — Input
 with st.sidebar:
