@@ -12,6 +12,7 @@ from predictors import (
     get_recommended_pdb,
     estimate_structural_impact,
     resolve_uniprot,
+    get_ppi_ddg_predictions,
 )
 from visualization import fetch_pdb, render_py3dmol_html
 
