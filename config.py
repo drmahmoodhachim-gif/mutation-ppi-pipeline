@@ -31,6 +31,11 @@ CARDIAC_MYOCYTE_INTERACTORS = {
         {"partner": "KCNE1", "uniprot": "P15382", "role": "MinK, IKs modulation"},
         {"partner": "Calmodulin", "uniprot": "P0DP23", "role": "Calcium-dependent regulation"},
     ],
+    "VCL": [
+        {"partner": "Talin", "uniprot": "Q9Y490", "role": "Focal adhesion, actin linkage"},
+        {"partner": "Actin", "uniprot": "P68133", "role": "F-actin binding, cytoskeleton"},
+        {"partner": "α-Catenin", "uniprot": "P35221", "role": "Cadherin adhesion complex"},
+    ],
 }
 
 # Default interactors when gene not in tissue-specific map

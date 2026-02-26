@@ -4,11 +4,13 @@ Input: gene, mutation, tissue → outputs all predictions + high-res 3D visualiz
 """
 
 import streamlit as st
-from config import GENE_UNIPROT, PROTEIN_PDB
+import pandas as pd
+from config import GENE_UNIPROT, PROTEIN_PDB, EXAMPLE_VARIANTS
 from predictors import (
     parse_mutation,
     get_alphamissense_prediction,
     get_tissue_interactors,
+    get_ppi_ddg_predictions,
     get_recommended_pdb,
     estimate_structural_impact,
     resolve_uniprot,
