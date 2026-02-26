@@ -144,7 +144,8 @@ if run_button or st.session_state.get("results_ready"):
             table_data = []
             for r in ddg_results:
                 ddg = r["mutant_ddg"]
-                pathway = "Weaker binding may reduce downstream coupling/signaling" if conclusion_input == "Decreased" else "Stronger binding may enhance downstream effects" if conclusion_input == "Increased" else "Similar affinity; minimal pathway impact"
+                conclusion = "Decreased" if ddg < 0 else "Increased" if ddg > 0 else "No change"
+                pathway = "Weaker binding may reduce downstream coupling/signaling" if conclusion == "Decreased" else "Stronger binding may enhance downstream effects" if conclusion == "Increased" else "Similar affinity; minimal pathway impact"
                 role = r.get("role", "").lower()
                 if "na+" in role or "sodium" in role:
                     pathway = "May alter late Na+ current and excitability"
@@ -161,7 +162,7 @@ if run_button or st.session_state.get("results_ready"):
                     "Role": r["role"],
                     "Wild-type (ref)": "0",
                     "Mutant ΔΔG (kcal/mol)": ddg,
-                    "Conclusion": conclusion_input,
+                    "Conclusion": conclusion,
                     "Pathway effect downstream": pathway,
                 })
             df = pd.DataFrame(table_data)
