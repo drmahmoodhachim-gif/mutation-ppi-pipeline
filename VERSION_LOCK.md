@@ -6,7 +6,9 @@
 
 1. **app.py**
    - Import: `from visualization import fetch_pdb, render_py3dmol_html`
+   - Import: `get_ppi_ddg_predictions` from predictors (REQUIRED for Section 4)
    - **NEVER** use `create_mol_viewer` in app.py (causes NameError)
+   - Welcome banner: **Hi Inna Aleksandrova** · مرحباً إينا ألكساندروفا · Привет, Инна Александрова (MUST remain after sub-header)
    - Welcome banner: "Hi Inna Aleksandrova" (Arabic, English, Russian) must remain
    - Section 6: PPI ΔΔG (wild vs mutant) for known interactors
 
