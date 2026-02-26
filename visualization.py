@@ -24,15 +24,9 @@ def fetch_pdb(pdb_id: str) -> Optional[str]:
 
 
 def _extract_chain(pdb_data: str, chain: str) -> str:
-    """Extract only specified chain from PDB for lighter 3D rendering."""
-    out = []
-    for line in pdb_data.split("\n"):
-        if line.startswith(("ATOM", "HETATM")):
-            if len(line) >= 22 and line[21:22].strip() == chain:
-                out.append(line)
-        else:
-            out.append(line)
-    return "\n".join(out) if out else pdb_data
+    """Extract only ATOM/HETATM for chain — lighter 3D (Nav1.5 has 4 chains)."""
+    out = [l for l in pdb_data.split("\n") if l.startswith(("ATOM", "HETATM")) and len(l) >= 22 and l[21:22].strip() == chain]
+    return "\n".join(out) + "\nEND\n" if out else pdb_data
 
 
 def create_mol_viewer(
@@ -76,15 +70,29 @@ def render_stmol(pdb_data: str, residue_pos: Optional[int] = None, height: int =
         st.warning(f"3D viewer unavailable: {e}. Install: pip install stmol py3Dmol")
 
 
-def render_py3dmol_html(pdb_data: str, residue_pos: Optional[int] = None, width: int = 800, height: int = 600) -> str:
+def render_py3dmol_html(
+    pdb_data: str,
+    residue_pos: Optional[int] = None,
+    highlight_color: str = "red",
+    label: Optional[str] = None,
+    width: int = 600,
+    height: int = 500,
+) -> str:
     """Generate embeddable HTML for py3Dmol 3D structure viewer."""
     if not HAS_PY3DMOL or not pdb_data:
         return ""
+    pdb_a = _extract_chain(pdb_data, "A")
     view = py3Dmol.view(width=width, height=height)
-    view.addModel(pdb_data, "pdb")
-    view.setStyle({"cartoon": {"colorscheme": "spectrum"}})
+    view.addModel(pdb_a, "pdb")
+    view.setStyle({"cartoon": {"colorscheme": "spectrum", "opacity": 0.85}})
     if residue_pos is not None:
-        view.setStyle({"resi": str(residue_pos)}, {"stick": {"colorscheme": "whiteCarbon"}, "cartoon": {"color": "red"}})
-        view.addLabel(f"Mutant {residue_pos}", {"fontColor": "black", "fontSize": 12, "backgroundColor": "white"}, {"resi": str(residue_pos)})
+        sel = {"resi": str(residue_pos), "chain": "A"}
+        view.setStyle(sel, {
+            "stick": {"color": highlight_color, "radius": 0.3},
+            "sphere": {"scale": 0.6, "color": highlight_color},
+            "cartoon": {"color": highlight_color},
+        })
+        lbl = label or f"Position {residue_pos}"
+        view.addLabel(lbl, {"fontColor": "white", "fontSize": 16, "backgroundColor": highlight_color}, sel)
     view.zoomTo()
     return view.write_html()

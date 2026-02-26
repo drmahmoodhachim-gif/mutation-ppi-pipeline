@@ -13,7 +13,7 @@ from predictors import (
     estimate_structural_impact,
     resolve_uniprot,
 )
-from visualization import fetch_pdb, render_py3dmol_html
+from visualization import fetch_pdb, create_mol_viewer
 
 # Page config
 st.set_page_config(
@@ -138,11 +138,20 @@ if run_button or st.session_state.get("results_ready"):
         if pdb_ids and pdb_choice in pdb_ids:
             pdb_data = fetch_pdb(pdb_choice)
             if pdb_data:
-                st.markdown("**Rotate, zoom, pan** — mutant residue highlighted in red")
-                html = render_py3dmol_html(pdb_data, residue_pos=pos)
-                if html:
-                    st.components.v1.html(html, height=650, scrolling=False)
-                else:
+                st.markdown("**Rotate, zoom, pan** — compare wild-type (blue) vs mutant (red) at position")
+                wt, mut = parsed.get("wt_aa", "—"), parsed.get("mut_aa", "—")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"**Wild-type** — {wt}{pos}")
+                    html_wt = render_py3dmol_html(pdb_data, residue_pos=pos, highlight_color="royalblue", label=f"Wild-type {wt}{pos}")
+                    if html_wt:
+                        st.components.v1.html(html_wt, height=520, scrolling=False)
+                with col2:
+                    st.markdown(f"**Mutant** — {wt}{pos}→{mut}")
+                    html_mut = render_py3dmol_html(pdb_data, residue_pos=pos, highlight_color="red", label=f"Mutant {wt}{pos}→{mut}")
+                    if html_mut:
+                        st.components.v1.html(html_mut, height=520, scrolling=False)
+                if not html_wt and not html_mut:
                     st.warning("3D viewer unavailable. Install: pip install py3Dmol")
             else:
                 st.warning("Could not fetch PDB structure.")
