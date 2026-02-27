@@ -158,7 +158,7 @@ if run_button or st.session_state.get("results_ready"):
             else:
                 st.warning("Could not fetch PDB structure.")
         else:
-            st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB or use AlphaFold DB.")
+            st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB. For disordered regions (e.g. SCN5A ~1054) or custom structures: [AlphaFold DB](https://alphafold.ebi.ac.uk/).")
 
         # --- Section 6: Next steps / mCSM-PPI2 ---
         st.header("6️⃣ PPI Binding Affinity (mCSM-PPI2)")

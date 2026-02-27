@@ -25,23 +25,32 @@ def parse_mutation(mutation_input: str) -> dict:
     """
     Parse mutation input in formats:
     - c.1577G>A
-    - p.R526H
+    - p.R526H, p.Ser1054Ala (3-letter or 1-letter AA codes)
     - R526H
     Returns: {gene, wt_aa, position, mut_aa, cds_pos}
     """
     result = {"gene": None, "wt_aa": None, "position": None, "mut_aa": None, "cds_pos": None}
 
-    # p.R526H or R526H
-    aa_match = re.search(r"[p.]?\s*([ARNDCEQGHILKMFPSTWYV])\s*(\d+)\s*([ARNDCEQGHILKMFPSTWYV])", mutation_input, re.I)
-    if aa_match:
-        result["wt_aa"] = aa_match.group(1).upper()
-        result["position"] = int(aa_match.group(2))
-        result["mut_aa"] = aa_match.group(3).upper()
-
     # c.1577G>A
     cds_match = re.search(r"[c.]?\s*(\d+)\s*([ACGT])\s*[>]\s*([ACGT])", mutation_input, re.I)
     if cds_match:
         result["cds_pos"] = int(cds_match.group(1))
+
+    # p.Ser1054Ala or p.S1054A — try 3-letter codes first to avoid matching "r" in "Ser" as Arg
+    aa3 = r"(Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val)"
+    aa3_match = re.search(rf"[p.]?\s*{aa3}\s*(\d+)\s*{aa3}\b", mutation_input, re.I)
+    if aa3_match:
+        result["wt_aa"] = AA_3_TO_1.get(aa3_match.group(1).capitalize(), aa3_match.group(1)[0].upper())
+        result["position"] = int(aa3_match.group(2))
+        result["mut_aa"] = AA_3_TO_1.get(aa3_match.group(3).capitalize(), aa3_match.group(3)[0].upper())
+        return result
+
+    # p.R526H or R526H (single-letter codes)
+    aa_match = re.search(r"\b([ARNDCEQGHILKMFPSTWYV])\s*(\d+)\s*([ARNDCEQGHILKMFPSTWYV])\b", mutation_input, re.I)
+    if aa_match:
+        result["wt_aa"] = aa_match.group(1).upper()
+        result["position"] = int(aa_match.group(2))
+        result["mut_aa"] = aa_match.group(3).upper()
 
     return result
 
