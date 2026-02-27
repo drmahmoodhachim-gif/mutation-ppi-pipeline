@@ -26,3 +26,4 @@ Thumbs.db
 *.log
 .env
 .env.local
+alphafold_out/
