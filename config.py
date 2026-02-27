@@ -26,7 +26,6 @@ CARDIAC_MYOCYTE_INTERACTORS = {
         {"partner": "SCN2B", "uniprot": "Q9UQ35", "role": "β2 subunit"},
         {"partner": "SCN3B", "uniprot": "Q9NY72", "role": "β3 subunit"},
         {"partner": "SCN4B", "uniprot": "Q9H0B8", "role": "β4 subunit"},
-        {"partner": "CSNK2A2", "uniprot": "P19784", "role": "Casein kinase 2, predicted phosphorylation (Group-Based Prediction)"},
     ],
     "KCNQ1": [
         {"partner": "KCNE1", "uniprot": "P15382", "role": "MinK, IKs modulation"},
@@ -36,7 +35,6 @@ CARDIAC_MYOCYTE_INTERACTORS = {
         {"partner": "Talin", "uniprot": "Q9Y490", "role": "Focal adhesion, actin linkage"},
         {"partner": "Actin", "uniprot": "P68133", "role": "F-actin binding, cytoskeleton"},
         {"partner": "α-Catenin", "uniprot": "P35221", "role": "Cadherin adhesion complex"},
-        {"partner": "VASP", "uniprot": "P50552", "role": "Vasodilator-stimulated phosphoprotein, actin dynamics"},
     ],
 }
 
@@ -51,15 +49,14 @@ PPI_PDB_COMPLEXES = {}
 
 # Known PDB structures for key proteins
 PROTEIN_PDB = {
-    "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5; AlphaFold for disordered regions (e.g. ~1054)
+    "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5 cardiac sodium channel
     "KCNQ1": ["6UZZ"],
     "MYH7": ["4DB1"],
-    "VCL": ["1TR2", "1SDR", "1SYQ"],  # 1TR2 preferred for linker region
+    "VCL": ["1TR2", "1SDR", "1SYQ"],   # Vinculin head domain
 }
 
-# Example variants for quick selection
 EXAMPLE_VARIANTS = [
-    {"gene": "SCN5A", "mutation": "c.1577G>A, p.R526H", "label": "SCN5A p.R526H — literature (PMID: 24795344)"},
+    {"gene": "SCN5A", "mutation": "c.1577G>A, p.R526H", "label": "SCN5A p.R526H — literature"},
     {"gene": "SCN5A", "mutation": "c.3160T>G, p.Ser1054Ala", "label": "SCN5A p.Ser1054Ala — cohort"},
     {"gene": "VCL", "mutation": "c.2507A>G, p.Gln836Arg", "label": "VCL p.Gln836Arg — cohort"},
 ]

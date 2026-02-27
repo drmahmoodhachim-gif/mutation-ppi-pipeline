@@ -31,33 +31,27 @@ def parse_mutation(mutation_input: str) -> dict:
     """
     result = {"gene": None, "wt_aa": None, "position": None, "mut_aa": None, "cds_pos": None}
 
-    # p.R526H or R526H
-    aa_match = re.search(r"[p.]?\s*([ARNDCEQGHILKMFPSTWYV])\s*(\d+)\s*([ARNDCEQGHILKMFPSTWYV])", mutation_input, re.I)
-    if aa_match:
-        result["wt_aa"] = aa_match.group(1).upper()
-        result["position"] = int(aa_match.group(2))
-        result["mut_aa"] = aa_match.group(3).upper()
+    # p.Ser1054Ala — 3-letter codes first
+    aa3_match = re.search(
+        r"[p.]?\s*(Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val)\s*(\d+)\s*(Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val)",
+        mutation_input, re.I,
+    )
+    if aa3_match:
+        result["wt_aa"] = AA_3_TO_1.get(aa3_match.group(1).capitalize(), aa3_match.group(1)[0])
+        result["position"] = int(aa3_match.group(2))
+        result["mut_aa"] = AA_3_TO_1.get(aa3_match.group(3).capitalize(), aa3_match.group(3)[0])
+    # p.R526H or R526H — single-letter
+    if not result.get("wt_aa"):
+        aa_match = re.search(r"[p.]?\s*([ARNDCEQGHILKMFPSTWYV])\s*(\d+)\s*([ARNDCEQGHILKMFPSTWYV])", mutation_input, re.I)
+        if aa_match:
+            result["wt_aa"] = aa_match.group(1).upper()
+            result["position"] = int(aa_match.group(2))
+            result["mut_aa"] = aa_match.group(3).upper()
 
     # c.1577G>A
     cds_match = re.search(r"[c.]?\s*(\d+)\s*([ACGT])\s*[>]\s*([ACGT])", mutation_input, re.I)
     if cds_match:
         result["cds_pos"] = int(cds_match.group(1))
-
-    # p.Ser1054Ala - 3-letter codes first (avoids "r" in Ser matching as Arg)
-    aa3 = r"(Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val)"
-    aa3_match = re.search(rf"[p.]?\s*{aa3}\s*(\d+)\s*{aa3}\b", mutation_input, re.I)
-    if aa3_match:
-        result["wt_aa"] = AA_3_TO_1.get(aa3_match.group(1).capitalize(), aa3_match.group(1)[0].upper())
-        result["position"] = int(aa3_match.group(2))
-        result["mut_aa"] = AA_3_TO_1.get(aa3_match.group(3).capitalize(), aa3_match.group(3)[0].upper())
-        return result
-
-    # p.R526H or R526H (single-letter)
-    aa_match = re.search(r"\b([ARNDCEQGHILKMFPSTWYV])\s*(\d+)\s*([ARNDCEQGHILKMFPSTWYV])\b", mutation_input, re.I)
-    if aa_match:
-        result["wt_aa"] = aa_match.group(1).upper()
-        result["position"] = int(aa_match.group(2))
-        result["mut_aa"] = aa_match.group(3).upper()
 
     return result
 
@@ -111,6 +105,38 @@ def resolve_uniprot(gene: str) -> Optional[str]:
     return None
 
 
+def _heuristic_ddg(wt_aa: str, mut_aa: str) -> float:
+    """Heuristic ΔΔG (kcal/mol). Positive = destabilizing."""
+    charge = {"R": 1, "K": 1, "D": -1, "E": -1, "H": 0.5}
+    c_wt, c_mut = charge.get(wt_aa, 0), charge.get(mut_aa, 0)
+    if abs(c_wt - c_mut) > 0.5:
+        return 2.0
+    hydrophobicity = {"A": 1.8, "R": -4.5, "N": -3.5, "D": -3.5, "C": 2.5, "Q": -3.5,
+                      "E": -3.5, "G": -0.4, "H": -3.2, "I": 4.5, "L": 3.8, "K": -3.9,
+                      "M": 1.9, "F": 2.8, "P": -1.6, "S": -0.8, "T": -0.7, "W": -0.9,
+                      "Y": -1.3, "V": 4.2}
+    h_wt, h_mut = hydrophobicity.get(wt_aa, 0), hydrophobicity.get(mut_aa, 0)
+    return 1.2 if abs(h_wt - h_mut) > 2 else 0.3
+
+def get_ppi_ddg_predictions(gene: str, wt_aa: str, mut_aa: str, position: int, interactors: list) -> list:
+    """Build PPI ΔΔG prediction rows for table."""
+    ddg = _heuristic_ddg(wt_aa, mut_aa)
+    rows = []
+    for ip in interactors:
+        conclusion = "Destabilizing" if ddg > 1.0 else ("Stabilizing" if ddg < -0.5 else "Neutral / unclear")
+        pathway = "May reduce binding affinity; downstream pathway may be impaired." if ddg > 1.0 else (
+            "May enhance binding; verify functional consequences." if ddg < -0.5 else
+            "Small effect; experimental validation recommended.")
+        rows.append({
+            "Interacting protein": ip.get("partner", "?"),
+            "Role": ip.get("role", ""),
+            "Wild-type ref": f"{wt_aa}{position}",
+            "Mutant ΔΔG (kcal/mol)": round(ddg, 2),
+            "Conclusion": conclusion,
+            "Pathway effect downstream": pathway,
+        })
+    return rows
+
 def get_tissue_interactors(gene: str, tissue: str) -> list:
     """Get protein interaction partners for tissue of interest."""
     gene_upper = gene.upper()
@@ -152,38 +178,3 @@ def estimate_structural_impact(wt_aa: str, mut_aa: str, position: int, in_voltag
         reasons.append("Conservative substitution")
 
     return {"impact": impact, "reasons": reasons}
-def _heuristic_ddg(wt_aa: str, mut_aa: str) -> float:
-    """Heuristic ΔΔG (kcal/mol) for binding."""
-    charge = {"R": 1, "K": 1, "D": -1, "E": -1, "H": 0.5}
-    hydro = {"A": 1.8, "R": -4.5, "N": -3.5, "D": -3.5, "C": 2.5, "E": -3.5, "H": -3.2,
-             "I": 4.5, "L": 3.8, "K": -3.9, "M": 1.9, "F": 2.8, "P": -1.6, "S": -0.8,
-             "T": -0.7, "W": -0.9, "Y": -1.3, "V": 4.2, "G": -0.4, "Q": -3.5}
-    dc = abs(charge.get(wt_aa, 0) - charge.get(mut_aa, 0))
-    dh = abs(hydro.get(wt_aa, 0) - hydro.get(mut_aa, 0))
-    ddg = 0
-    if dc > 0.5:
-        ddg -= 1.5
-    if dh > 2:
-        ddg -= 0.8
-    return round(ddg, 1)
-
-
-def get_ppi_ddg_predictions(gene: str, interactors: list, wt_aa: str, pos: int, mut_aa: str) -> list:
-    """Get ΔΔG (wild vs mutant) for each known PPI."""
-    results = []
-    for ip in interactors:
-        partner = ip.get("partner", "")
-        key = (gene.upper(), partner)
-        complex_info = PPI_PDB_COMPLEXES.get(key)
-        low, high = (complex_info["uniprot_range"]) if complex_info else (0, 0)
-        in_range = complex_info and low <= pos <= high
-        ddg = _heuristic_ddg(wt_aa, mut_aa)
-        results.append({
-            "partner": partner,
-            "role": ip.get("role", ""),
-            "uniprot": ip.get("uniprot", ""),
-            "mutant_ddg": ddg,
-            "method": "heuristic",
-            "in_interface": in_range,
-        })
-    return results

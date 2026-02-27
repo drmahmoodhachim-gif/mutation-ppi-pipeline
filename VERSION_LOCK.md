@@ -47,13 +47,8 @@
 - VCL (Vinculin) in config
 - mCSM-PPI2 link for manual predictions
 
-## DO NOT CHANGE — This script works perfectly
+## Before making changes
 
-- Example variant dropdown (SCN5A p.R526H, p.Ser1054Ala, VCL p.Gln836Arg)
-- Conclusion dropdown (Decreased / Increased / No change)
-- PPI ΔΔG table with Interacting protein, Role, Wild-type, Mutant ΔΔG, Conclusion, Pathway effect
-- 3-letter mutation parsing (p.Ser1054Ala, p.Gln836Arg)
-
-## Recovery
-
-If broken: `git checkout aa8f251` or `git checkout v1.0-perfect` to restore this perfect version.
+1. Run: `streamlit run app.py`
+2. Verify: no NameError, welcome shows, 3D works, PPI ΔΔG shows
+3. Do NOT change the visualization import

@@ -46,11 +46,26 @@ st.markdown(
 # Sidebar — Input
 with st.sidebar:
     st.header("📥 Input")
-    gene = st.text_input("Gene symbol", value="SCN5A", help="e.g., SCN5A, MYH7, KCNQ1")
+    example_choice = st.selectbox(
+        "Example variant",
+        [""] + [v["label"] for v in EXAMPLE_VARIANTS],
+        index=0,
+        help="Load a pre-filled mutation",
+    )
+    if example_choice:
+        ex = next((v for v in EXAMPLE_VARIANTS if v["label"] == example_choice), None)
+        if ex:
+            _gene, _mut = ex["gene"], ex["mutation"]
+        else:
+            _gene, _mut = "SCN5A", "c.1577G>A, p.R526H"
+    else:
+        _gene, _mut = "SCN5A", "c.1577G>A, p.R526H"
+    gene = st.text_input("Gene symbol", value=_gene, key="gene_in")
     mutation_input = st.text_input(
         "Mutation",
-        value="c.1577G>A, p.R526H",
-        help="Formats: c.1577G>A, p.R526H, or R526H",
+        value=_mut,
+        key="mut_in",
+        help="Formats: c.1577G>A, p.R526H, p.Ser1054Ala, or R526H",
     )
     tissue = st.selectbox(
         "Tissue of interest",
@@ -119,10 +134,15 @@ if run_button or st.session_state.get("results_ready"):
         if in_voltage_sensor:
             st.info("Position likely in DII voltage-sensor region — charge changes can severely affect gating.")
 
-        # --- Section 4: Tissue-specific PPIs ---
-        st.header("4️⃣ Tissue-Specific Protein Interactions")
+        # --- Section 4: Tissue-Specific Protein Interactions & PPI ΔΔG ---
+        st.header("4️⃣ Tissue-Specific Protein Interactions & PPI ΔΔG")
         interactors = get_tissue_interactors(gene, tissue)
-        if interactors:
+        if interactors and wt and mut and pos:
+            ppi_rows = get_ppi_ddg_predictions(gene, wt, mut, pos, interactors)
+            df = pd.DataFrame(ppi_rows)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.caption("ΔΔG is heuristic (charge/hydrophobicity); for interface residues use mCSM-PPI2 for partner-specific predictions.")
+        elif interactors:
             for ip in interactors:
                 with st.expander(f"**{ip['partner']}** — {ip['role']}"):
                     st.write(f"UniProt: {ip['uniprot']}")
@@ -158,7 +178,7 @@ if run_button or st.session_state.get("results_ready"):
             else:
                 st.warning("Could not fetch PDB structure.")
         else:
-            st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB. For disordered regions (e.g. SCN5A ~1054) or custom structures: [AlphaFold DB](https://alphafold.ebi.ac.uk/).")
+            st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB or use AlphaFold DB.")
 
         # --- Section 6: Next steps / mCSM-PPI2 ---
         st.header("6️⃣ PPI Binding Affinity (mCSM-PPI2)")
