@@ -46,8 +46,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Data sources, attributions & legal
-with st.expander("📋 Data Sources, Attributions & Legal", expanded=False):
+# Disclaimer — always visible
+st.info(
+    "**Disclaimer:** For research and educational use only. Not medical advice. Predictions are theoretical models. "
+    "Do not use as a substitute for professional medical advice, diagnosis, or treatment."
+)
+
+# Data sources, attributions & legal — expanded by default so users see it
+with st.expander("📋 Data Sources, Attributions & Legal", expanded=True):
     st.markdown("""
     **Disclaimer:** This tool is for research and educational use only. Predictions are theoretical models and do not constitute medical or clinical advice. Do not use as a substitute for professional medical advice, diagnosis, or treatment.
 
