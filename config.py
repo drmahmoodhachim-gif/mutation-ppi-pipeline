@@ -49,18 +49,11 @@ PPI_PDB_COMPLEXES = {}
 
 # Known PDB structures for key proteins
 PROTEIN_PDB = {
-    "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5 cardiac sodium channel
+    "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5; AlphaFold for disordered regions (e.g. ~1054)
     "KCNQ1": ["6UZZ"],
     "MYH7": ["4DB1"],
-    "VCL": ["1SDR", "1SYQ"],  # Vinculin structures
+    "VCL": ["1TR2", "1SDR", "1SYQ"],  # 1TR2 preferred for linker region
 }
-
-# Example variants for quick selection
-EXAMPLE_VARIANTS = [
-    {"gene": "SCN5A", "mutation": "c.1577G>A, p.R526H", "label": "SCN5A p.R526H — literature (phosphorylation site, PMID: 24795344)"},
-    {"gene": "SCN5A", "mutation": "c.3160T>G, p.Ser1054Ala", "label": "SCN5A p.Ser1054Ala — cohort (disordered region, predicted phosphosite)"},
-    {"gene": "VCL", "mutation": "c.2507A>G, p.Gln836Arg", "label": "VCL p.Gln836Arg — cohort (vinculin linker region)"},
-]
 
 # AlphaMissense API
 ALPHAMISSENSE_API = "https://alphamissense.hegelab.org/hotspotapi"

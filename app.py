@@ -157,6 +157,10 @@ if run_button or st.session_state.get("results_ready"):
                     pathway = "May affect focal adhesion dynamics"
                 elif "iks" in role or "modulation" in role:
                     pathway = "May alter IKs channel modulation"
+                elif "phosphorylation" in role or "kinase" in role or "csnk2a2" in role:
+                    pathway = "May affect kinase-mediated phosphorylation at this site"
+                elif "vasp" in role:
+                    pathway = "May alter VASP-mediated actin dynamics and focal adhesion"
                 table_data.append({
                     "Interacting protein": r["partner"],
                     "Role": r["role"],
@@ -167,7 +171,7 @@ if run_button or st.session_state.get("results_ready"):
                 })
             df = pd.DataFrame(table_data)
             st.dataframe(df, use_container_width=True, hide_index=True)
-            st.caption("ΔΔG calculated immediately (heuristic). Conclusion derived from ΔΔG.")
+            st.caption("ΔΔG from heuristic (charge/hydrophobicity). Identical values across partners may indicate mutation affects overall stability rather than partner-specific interfaces; use mCSM-PPI2 for interface-specific predictions.")
         elif interactors:
             for ip in interactors:
                 with st.expander(f"**{ip['partner']}** — {ip['role']}"):
@@ -205,7 +209,7 @@ if run_button or st.session_state.get("results_ready"):
             else:
                 st.warning("Could not fetch PDB structure.")
         else:
-            st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB or use AlphaFold DB.")
+            st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB. For disordered regions (e.g. SCN5A ~1054) or custom structures: [AlphaFold DB](https://alphafold.ebi.ac.uk/).")
 
         # --- Section 6: Next steps / mCSM-PPI2 ---
         st.header("6️⃣ PPI Binding Affinity (mCSM-PPI2)")
