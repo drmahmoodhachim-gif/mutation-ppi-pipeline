@@ -46,6 +46,24 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Data sources, attributions & legal
+with st.expander("📋 Data Sources, Attributions & Legal", expanded=False):
+    st.markdown("""
+    **Disclaimer:** This tool is for research and educational use only. Predictions are theoretical models and do not constitute medical or clinical advice. Do not use as a substitute for professional medical advice, diagnosis, or treatment.
+
+    **Educational use:** This pipeline uses publicly available data from the following sources. Attribution and good scientific practice apply.
+    """)
+    st.markdown("""
+    | Source | Data / Purpose | License / Terms |
+    |--------|----------------|-----------------|
+    | [UniProt](https://www.uniprot.org/) | Canonical sequences, protein metadata | CC BY-ND; [attribution expected](https://www.uniprot.org/help/license) |
+    | [AlphaFold DB](https://alphafold.ebi.ac.uk/) (EMBL-EBI) | Protein structure predictions, pLDDT | [EMBL-EBI terms](https://www.ebi.ac.uk/about/terms-of-use); cite [AlphaFold DB](https://www.ebi.ac.uk/training/online/courses/navigating-alphafold-database/citing-the-database/) |
+    | [AlphaMissense](https://alphamissense.hegelab.org/) | Pathogenicity scores | CC BY-NC-SA (non-commercial); [disclaimers apply](https://alphamissense.hegelab.org/help) |
+    | [RCSB PDB](https://www.rcsb.org/) | Experimental structures | CC0; [attribution encouraged](https://www.rcsb.org/pages/usage-policy) |
+    | [mCSM-PPI2](https://biosig.lab.uq.edu.au/mcsm_ppi2/) | PPI ΔΔG predictions (external link) | [Rodrigues et al., NAR 2019](https://doi.org/10.1093/nar/gkz383) |
+    """)
+    st.caption("Property and intellectual rights remain with the respective data providers. Users must comply with each source's terms when publishing or redistributing results.")
+
 # Sidebar — Input
 with st.sidebar:
     st.header("📥 Input")
