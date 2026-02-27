@@ -14,11 +14,14 @@ from predictors import (
     parse_mutation,
     get_alphamissense_prediction,
     get_tissue_interactors,
-    get_ppi_ddg_predictions,
     get_recommended_pdb,
     estimate_structural_impact,
     resolve_uniprot,
 )
+try:
+    from predictors import get_ppi_ddg_predictions
+except ImportError:
+    get_ppi_ddg_predictions = None
 from visualization import fetch_pdb, render_py3dmol_html
 
 # Page config
