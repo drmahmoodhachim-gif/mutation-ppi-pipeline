@@ -135,29 +135,72 @@ def get_tissue_interactors(gene: str, tissue: str) -> list:
     return []
 
 
-def get_recommended_pdb(gene: str, pos: int = None) -> dict:
-    """Returns: {pdb_id, chain, has_residue_coordinates, mapping_method, pdb_ids, notes}. Residue-aware per PDB."""
+def get_recommended_pdb(
+    gene: str,
+    pos: int = None,
+    uniprot_seq: str = None,
+) -> dict:
+    """
+    Returns: {pdb_id, chain, has_residue_coordinates, mapping_method, pdb_ids, pdb_resseq, notes}.
+    When uniprot_seq and pos provided, maps UniProt -> PDB resseq before checking residue presence.
+    """
     pdb_ids = PROTEIN_PDB.get(gene.upper(), [])
     chosen = pdb_ids[0] if pdb_ids else None
     has_res = True
     notes = "OK"
     mapping_method = "config"
+    pdb_resseq = None
 
     if pos and pdb_ids:
         try:
             from visualization import fetch_pdb, residue_in_pdb
+            from residue_mapper import extract_chain_residues, map_uniprot_to_pdb
+
             found = False
             for pid in pdb_ids:
                 pd = fetch_pdb(pid)
-                if pd and residue_in_pdb(pd, pos, "A"):
-                    chosen = pid
-                    has_res = True
-                    found = True
-                    break
+                if not pd:
+                    continue
+                # Map UniProt pos -> PDB resseq when sequence available
+                if uniprot_seq:
+                    residues = extract_chain_residues(pd, "A")
+                    mapping = map_uniprot_to_pdb(uniprot_seq, residues)
+                    pdb_resseq = mapping.get(pos)
+                    if pdb_resseq is not None and residue_in_pdb(pd, pdb_resseq, "A"):
+                        chosen = pid
+                        has_res = True
+                        found = True
+                        mapping_method = "alignment"
+                        notes = "OK"
+                        break
+                else:
+                    # Fallback: assume UniProt pos == PDB resseq
+                    if residue_in_pdb(pd, pos, "A"):
+                        chosen = pid
+                        has_res = True
+                        found = True
+                        pdb_resseq = pos
+                        mapping_method = "assumed_1:1"
+                        break
+
             if not found:
                 chosen = pdb_ids[0]
                 has_res = False
-                notes = "Residue not present/resolved in available PDBs; recommend AlphaFold."
+                if uniprot_seq and pdb_resseq is None:
+                    notes = "No UniProt↔PDB mapping; residue not found. Recommend AlphaFold."
+                else:
+                    notes = "Residue not present/resolved in available PDBs; recommend AlphaFold."
+        except ImportError:
+            # residue_mapper not available — fall back to raw position
+            from visualization import fetch_pdb, residue_in_pdb
+            for pid in pdb_ids:
+                pd = fetch_pdb(pid)
+                if pd and residue_in_pdb(pd, pos, "A"):
+                    chosen, has_res, found = pid, True, True
+                    break
+            else:
+                has_res, found = False, False
+                notes = "Could not verify residue (mapping unavailable); recommend AlphaFold."
         except Exception:
             has_res = False
             notes = "Could not verify residue in PDBs; recommend AlphaFold or check mapping."
@@ -168,6 +211,7 @@ def get_recommended_pdb(gene: str, pos: int = None) -> dict:
         "has_residue_coordinates": has_res if pos else True,
         "mapping_method": mapping_method,
         "pdb_ids": pdb_ids,
+        "pdb_resseq": pdb_resseq,
         "notes": notes,
     }
 
@@ -206,10 +250,10 @@ def get_ppi_ddg_predictions(
         ppi_ddg = None
         method = "NA_no_complex"
         conclusion = "Neutral/Unclear"
-        notes = "No interface model; residue not confirmed at interface."
+        notes = "No complex model available; interface-specific ΔΔG not computed."
         confidence = "—"
         got_pdb = False
-        pdb_resseq = position
+        pdb_resseq = None
 
         if has_c:
             try:
@@ -265,11 +309,17 @@ def get_ppi_ddg_predictions(
             except Exception:
                 notes = "Complex unavailable."
 
+        mapping_conf = "—"
+        if has_c and got_pdb and canonical_seq:
+            mapping_conf = "mapped" if pdb_resseq is not None else "not mapped"
+
         rows.append({
             "Interacting protein": label,
             "Role": role,
             "Tissue evidence": "Present",
             "Complex model available?": "Y" if (has_c and got_pdb) else "N",
+            "Mapped PDB resseq": pdb_resseq if (has_c and pdb_resseq is not None) else "—",
+            "Mapping confidence": mapping_conf,
             "Interface residue?": "Y" if (interface_info and interface_info.get("is_interface")) else ("N" if interface_info else "—"),
             "PPI Delta-Delta-G (kcal/mol)": ppi_ddg if ppi_ddg is not None else "NA",
             "Method": method,

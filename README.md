@@ -11,13 +11,15 @@ An **interactive pipeline** that takes a **mutation** (e.g., SCN5A c.1577G>A, p.
 ## Quick start (local)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mutation-ppi-pipeline.git
+git clone https://github.com/drmahmoodhachim-gif/mutation-ppi-pipeline.git
 cd mutation-ppi-pipeline
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
 Then open the URL (usually http://localhost:8501) in your browser.
+
+**How to use:** Enter gene and mutation (e.g. `p.R526H`), choose tissue and analysis mode, click **Run Pipeline**. If the mutant structure is missing, use **Predict here** (≤400 residues) or follow **Option B** to predict with ColabFold/Robetta.
 
 ## Deploy live (Streamlit Community Cloud)
 

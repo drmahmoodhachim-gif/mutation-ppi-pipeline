@@ -107,6 +107,13 @@ with st.expander("📋 Data Sources, Attributions & Legal", expanded=True):
 # Sidebar — Input
 with st.sidebar:
     st.header("📥 Input")
+    with st.expander("How to use", expanded=False):
+        st.markdown("""
+        1. Enter **gene** and **mutation** (e.g. `p.R526H`)
+        2. Choose **tissue** and **analysis mode**
+        3. Click **Run Pipeline**
+        4. If mutant is missing from AlphaFold DB: use the **Predict here** button (≤400 residues) or follow **Option B** to predict externally.
+        """)
     gene = st.text_input("Gene symbol", value="SCN5A", help="e.g., SCN5A, MYH7, KCNQ1")
     mutation_input = st.text_input(
         "Mutation",
@@ -160,10 +167,12 @@ else:
         st.warning("WT/mutant not fully parsed. Use p.R526H format.")
         qc_ok = False
 
-# PDB coverage
-pdb_rec = get_recommended_pdb(gene, pos)
+# PDB coverage (with UniProt->PDB mapping when canonical available)
+pdb_rec = get_recommended_pdb(gene, pos, uniprot_seq=canonical_fasta)
 has_res = pdb_rec.get("has_residue_coordinates", True)
 pdb_ids = pdb_rec.get("pdb_ids", [])
+pdb_resseq = pdb_rec.get("pdb_resseq")
+mapping_method = pdb_rec.get("mapping_method", "—")
 
 col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
@@ -176,6 +185,8 @@ with col4:
     st.metric("Residue in PDB?", "Yes" if has_res else "No")
 with col5:
     st.metric("WT check", "✅ OK" if qc_ok else "⚠️ Warn")
+if pdb_resseq is not None or mapping_method not in ("—", "config"):
+    st.caption(f"**Mapping:** {mapping_method} · **Mapped PDB resseq:** {pdb_resseq if pdb_resseq is not None else '—'}")
 
 if not (run_button or st.session_state.get("results_ready")):
     st.info("👈 Click **Run Pipeline** to continue.")
@@ -216,10 +227,72 @@ with st.spinner("Running predictions..."):
                 st.warning("AlphaFold cache not found — fetching from AlphaFold DB or manual setup required.")
                 st.caption(af_result["wt"].get("how_to_generate_cache", ""))
             elif not mut_ok:
-                st.info("WT structure from AlphaFold DB. Mutant not in DB — ΔpLDDT requires local AlphaFold run.")
+                st.info("WT structure from AlphaFold DB. Mutant not in DB — predict mutant to get ΔpLDDT.")
                 plddt_arr = af_result["wt"].get("per_res_plddt", [])
                 if pos and plddt_arr and 1 <= pos <= len(plddt_arr):
                     st.metric("WT pLDDT at site", round(plddt_arr[pos - 1], 1), help="Per-residue confidence at mutation site")
+
+                mut_seq = canonical_fasta[: pos - 1] + mut + canonical_fasta[pos:]
+                from alphafold_runner import _seq_hash, predict_via_esm_atlas
+                import os
+                out_dir = os.path.join(os.path.dirname(__file__), "alphafold_out")
+                mut_hash = _seq_hash(mut_seq)
+                cache_dir = os.path.join(out_dir, "cache", mut_hash)
+                esm_limit = 400
+
+                with st.expander("📌 How to get mutant structure (ΔpLDDT)", expanded=True):
+                    st.markdown("#### **Option A: Predict here** *(sequences ≤400 residues only)*")
+                    st.caption("Click the button below. No sign-up. Uses ESM Atlas API; takes ~30–90 seconds.")
+                    if len(mut_seq) <= esm_limit:
+                        if st.button("▶ Predict mutant structure now", type="primary", key="predict_mut_esm"):
+                            with st.spinner("Predicting structure via ESM Atlas (30–90 seconds)…"):
+                                res = predict_via_esm_atlas(mut_seq, out_dir)
+                            if res:
+                                st.success("Done. Reloading…")
+                                st.rerun()
+                            else:
+                                st.error("Prediction failed. Use Option B below.")
+                    else:
+                        st.warning(f"Your protein is {len(mut_seq)} residues. Option A supports up to 400. Use Option B.")
+
+                    st.markdown("---")
+                    st.markdown("#### **Option B: Use an external tool** *(any length)*")
+                    st.markdown("**Step 1 — Download mutant sequence**")
+                    fasta_content = f">mutant_{gene}_{wt}{pos}{mut}\n{mut_seq}"
+                    st.download_button(
+                        label="⬇ Download mutant FASTA",
+                        data=fasta_content,
+                        file_name=f"mutant_{gene}_{wt}{pos}{mut}.fasta",
+                        mime="text/plain",
+                        key="dl_mut_fasta",
+                    )
+                    st.markdown("**Step 2 — Run a prediction**")
+                    st.markdown("""
+                    Open one of these (free, no sign-up), paste the sequence from the FASTA, and run:
+                    """)
+                    st.markdown("""
+                    | Tool | Link |
+                    |------|------|
+                    | ColabFold | [colab.research.google.com/.../ColabFold](https://colab.research.google.com/github/sokrypton/ColabFold/blob/main/AlphaFold2.ipynb) |
+                    | AlphaFold Server | [alphafoldserver.com](https://alphafoldserver.com) |
+                    | Robetta | [robetta.bakerlab.org](https://robetta.bakerlab.org) |
+                    """)
+                    st.markdown("**Step 3 — Save outputs locally**")
+                    st.markdown("Place these two files in the folder below *(only works when running the app locally, not on Streamlit Cloud)*:")
+                    st.code(cache_dir, language=None)
+                    st.markdown("""
+                    | File | What to save |
+                    |------|--------------|
+                    | `ranked_0.pdb` | Best model PDB from the tool |
+                    | `plddt.json` | `{"plddt": [92.5, 88, ...]}` — one score per residue |
+                    """)
+                    with st.expander("ℹ If you only have a PDB file"):
+                        st.markdown("""
+                        Many tools put pLDDT in the PDB B-factor column. Create `plddt.json` by listing those B-factors:
+                        `{"plddt": [92.5, 88, 91, ...]}`.
+                        """)
+                    st.markdown("**Step 4 — Re-run**")
+                    st.markdown("Click **Run Pipeline** in the sidebar. The app will load the cached mutant and show ΔpLDDT.")
             else:
                 af_deltas = compute_local_structure_deltas_from_af(af_result["wt"], af_result["mut"], pos)
                 st.metric("ΔpLDDT (window)", af_deltas.get("delta_mean_plddt_window"), help="AlphaFold local confidence change")
@@ -261,13 +334,15 @@ with st.spinner("Running predictions..."):
     if pdb_ids and pdb_choice in pdb_ids:
         pdb_data = fetch_pdb(pdb_choice)
         if pdb_data:
+            # Use mapped PDB resseq when available (same PDB as recommended)
+            res_pos = pdb_resseq if (pdb_choice == pdb_rec.get("pdb_id") and pdb_resseq is not None) else pos
             col1, col2 = st.columns(2)
             with col1:
-                html_wt = render_py3dmol_html(pdb_data, residue_pos=pos, highlight_color="royalblue", label=f"WT {wt}{pos}")
+                html_wt = render_py3dmol_html(pdb_data, residue_pos=res_pos, highlight_color="royalblue", label=f"WT {wt}{pos}")
                 if html_wt:
                     st.components.v1.html(html_wt, height=520, scrolling=False)
             with col2:
-                html_mut = render_py3dmol_html(pdb_data, residue_pos=pos, highlight_color="red", label=f"Mut {wt}{pos}→{mut}")
+                html_mut = render_py3dmol_html(pdb_data, residue_pos=res_pos, highlight_color="red", label=f"Mut {wt}{pos}→{mut}")
                 if html_mut:
                     st.components.v1.html(html_mut, height=520, scrolling=False)
         else:

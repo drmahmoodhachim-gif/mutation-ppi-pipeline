@@ -11,6 +11,8 @@ except ImportError:
     requests = None
 
 AF_DB_API = "https://alphafold.ebi.ac.uk/api/prediction"
+ESM_ATLAS_API = "https://api.esmatlas.com/foldSequence/v1/pdb/"
+ESM_ATLAS_MAX_LEN = 400
 
 
 def _seq_hash(seq: str) -> str:
@@ -111,6 +113,60 @@ def fetch_from_alphafold_db(uniprot_id: str, sequence: str, out_dir: str) -> Opt
         with open(plddt_path, "w") as f:
             json.dump({"plddt": per_res}, f)
         return cache_dir
+    except Exception:
+        return None
+
+
+def _extract_plddt_from_pdb(pdb_path: str) -> list:
+    """Extract per-residue pLDDT from B-factor column in PDB (ESMFold/AlphaFold format)."""
+    per_res = []
+    prev = None
+    with open(pdb_path, "r") as f:
+        for line in f:
+            if line.startswith(("ATOM", "HETATM")) and len(line) >= 66:
+                try:
+                    resi = line[22:26].strip()
+                    bfac = float(line[60:66])
+                    if (resi, line[21:22]) != prev:
+                        prev = (resi, line[21:22])
+                        per_res.append(bfac)
+                except (ValueError, IndexError):
+                    pass
+    return per_res
+
+
+def predict_via_esm_atlas(sequence: str, out_dir: str) -> Optional[dict]:
+    """
+    Predict structure via ESM Atlas API (no auth). Sequences up to 400 residues.
+    Saves ranked_0.pdb and plddt.json to cache, returns same dict as run_alphafold_single when cached.
+    Returns None if API fails or sequence too long.
+    """
+    if not requests or len(sequence) > ESM_ATLAS_MAX_LEN:
+        return None
+    try:
+        r = requests.post(ESM_ATLAS_API, data=sequence.encode(), timeout=120)
+        if not r.ok:
+            return None
+        cache_key = _seq_hash(sequence)
+        cache_dir = os.path.join(out_dir, "cache", cache_key)
+        os.makedirs(cache_dir, exist_ok=True)
+        pdb_path = os.path.join(cache_dir, "ranked_0.pdb")
+        plddt_path = os.path.join(cache_dir, "plddt.json")
+        with open(pdb_path, "wb") as f:
+            f.write(r.content)
+        per_res = _extract_plddt_from_pdb(pdb_path)
+        if not per_res:
+            return None
+        mean_plddt = float(sum(per_res) / len(per_res))
+        with open(plddt_path, "w") as f:
+            json.dump({"plddt": per_res}, f)
+        return {
+            "status": "cached",
+            "pdb_path": pdb_path,
+            "plddt_path": plddt_path,
+            "mean_plddt": mean_plddt,
+            "per_res_plddt": per_res,
+        }
     except Exception:
         return None
 

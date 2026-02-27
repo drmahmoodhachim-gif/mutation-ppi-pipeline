@@ -27,8 +27,9 @@ def is_residue_at_interface(
             if len(line) < 54:
                 continue
             ch = line[21:22].strip()
+            res_str = line[22:26].strip()
             try:
-                res = int(line[22:26].strip().lstrip("-") or 0)
+                res = int(res_str)
             except ValueError:
                 continue
             if ch != chain_id or res != resi:
