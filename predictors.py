@@ -20,9 +20,11 @@ AA_3_TO_1 = {
 }
 
 
-def parse_mutation(mutation_input: str, gene: str = None) -> dict:
+def parse_mutation(mutation_input: str, gene: str = None, position: int = None, wt_aa: str = None, mut_aa: str = None) -> dict:
     """
     Returns: gene, uniprot_id, wt, pos, mut, variant_id, wt_aa, position, mut_aa, cds_pos, warnings.
+    Supports: p.R526H, R526H, Ser1054Ala, c.1577G>A; also position+wt+mut (526 R H, 526 R→H).
+    If position, wt_aa, mut_aa are provided, they override parsing.
     """
     warnings = []
     result = {"gene": gene, "uniprot_id": None, "wt": None, "pos": None, "mut": None,
@@ -30,17 +32,33 @@ def parse_mutation(mutation_input: str, gene: str = None) -> dict:
     if gene:
         result["uniprot_id"] = GENE_UNIPROT.get(gene.upper()) or _resolve_uniprot_id(gene)
 
-    aa3 = re.search(r"[p.]?\s*(Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val)\s*(\d+)\s*(Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val)", mutation_input, re.I)
-    if aa3:
-        result["wt_aa"] = AA_3_TO_1.get(aa3.group(1).capitalize(), aa3.group(1)[0])
-        result["position"] = int(aa3.group(2))
-        result["mut_aa"] = AA_3_TO_1.get(aa3.group(3).capitalize(), aa3.group(3)[0])
-    if not result.get("wt_aa"):
-        aa_match = re.search(r"[p.]?\s*([ARNDCEQGHILKMFPSTWYV])\s*(\d+)\s*([ARNDCEQGHILKMFPSTWYV])", mutation_input, re.I)
-        if aa_match:
-            result["wt_aa"] = aa_match.group(1).upper()
-            result["position"] = int(aa_match.group(2))
-            result["mut_aa"] = aa_match.group(3).upper()
+    # Direct override when position, wt_aa, mut_aa provided
+    if position is not None and wt_aa and mut_aa:
+        result["position"] = int(position)
+        result["wt_aa"] = wt_aa.upper() if len(wt_aa) == 1 else AA_3_TO_1.get(wt_aa.capitalize()[:3], wt_aa[0])
+        result["mut_aa"] = mut_aa.upper() if len(mut_aa) == 1 else AA_3_TO_1.get(mut_aa.capitalize()[:3], mut_aa[0])
+    else:
+        # Parse from text
+        aa3 = re.search(r"[p.]?\s*(Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val)\s*(\d+)\s*(Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val)", mutation_input, re.I)
+        if aa3:
+            result["wt_aa"] = AA_3_TO_1.get(aa3.group(1).capitalize(), aa3.group(1)[0])
+            result["position"] = int(aa3.group(2))
+            result["mut_aa"] = AA_3_TO_1.get(aa3.group(3).capitalize(), aa3.group(3)[0])
+        if not result.get("wt_aa"):
+            aa_match = re.search(r"[p.]?\s*([ARNDCEQGHILKMFPSTWYV])\s*(\d+)\s*([ARNDCEQGHILKMFPSTWYV])", mutation_input, re.I)
+            if aa_match:
+                result["wt_aa"] = aa_match.group(1).upper()
+                result["position"] = int(aa_match.group(2))
+                result["mut_aa"] = aa_match.group(3).upper()
+        if not result.get("wt_aa"):
+            # Simple format: position wt mut (526 R H, 526 R→H, 526 R->H, 526 R to H)
+            simple = re.search(r"(?:^|position\s*)?(\d+)\s*([ARNDCEQGHILKMFPSTWYV])\s*(?:->|→|to)\s*([ARNDCEQGHILKMFPSTWYV])", mutation_input, re.I)
+            if not simple:
+                simple = re.search(r"(?:^|\s)(\d+)\s+([ARNDCEQGHILKMFPSTWYV])\s+([ARNDCEQGHILKMFPSTWYV])\s*$", mutation_input, re.I)
+            if simple:
+                result["position"] = int(simple.group(1))
+                result["wt_aa"] = simple.group(2).upper()
+                result["mut_aa"] = simple.group(3).upper()
 
     result["wt"], result["pos"], result["mut"] = result["wt_aa"], result["position"], result["mut_aa"]
     if result.get("gene") and result.get("wt") and result.get("pos") and result.get("mut"):
@@ -127,24 +145,114 @@ def get_alphamissense_prediction(gene: str, position: int, wt_aa: str, mut_aa: s
         return {"error": str(e), "url": url}
 
 
-def get_tissue_interactors(gene: str, tissue: str) -> list:
+STRING_API = "https://string-db.org/api"
+STRING_SPECIES = 9606  # Human
+
+
+def _fetch_string_interactors(uniprot_id: str, limit: int = 15) -> list:
+    """Fetch interaction partners from STRING API for any UniProt ID. Returns list of {partner, label, uniprot, role}."""
+    if not uniprot_id or not requests:
+        return []
+    try:
+        r = requests.post(
+            f"{STRING_API}/tsv/interaction_partners",
+            data={"identifiers": uniprot_id, "species": STRING_SPECIES, "limit": limit, "caller_identity": "mutation-ppi-pipeline"},
+            timeout=15,
+        )
+        if not r.ok or not r.text.strip():
+            return []
+        lines = r.text.strip().split("\n")
+        if len(lines) < 2:
+            return []
+        header = [h.strip().lower().replace("-", "_") for h in lines[0].split("\t")]
+        # interaction_partners: preferredName_B is partner (or column 1/2)
+        idx_name = next((i for i, h in enumerate(header) if "preferredname_b" in h or "preferred_name_b" in h or ("preferred" in h and "b" in h)), None)
+        if idx_name is None:
+            idx_name = next((i for i, h in enumerate(header) if "name" in h and "b" in h), 1)
+        idx_score = next((i for i, h in enumerate(header) if "score" in h), -1)
+        result = []
+        seen = set()
+        for line in lines[1:]:
+            parts = line.split("\t")
+            if len(parts) <= max(idx_name, 0):
+                continue
+            name = (parts[idx_name] or "?").strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            score = float(parts[idx_score]) if 0 <= idx_score < len(parts) and parts[idx_score] else 0
+            result.append({
+                "partner": name,
+                "label": name,
+                "uniprot": "",
+                "role": f"STRING score {score:.0%}" if score else "Interaction partner",
+            })
+        return result
+    except Exception:
+        return []
+
+
+def get_tissue_interactors(gene: str, tissue: str, uniprot_id: str = None) -> list:
+    """Get interactors: curated when available, else STRING API for any gene."""
     gene_upper = gene.upper()
     t = tissue.lower()
+    curated = []
     if any(kw in t for kw in ("cardiac", "heart", "cardiomyocyte", "myocyte")):
-        return CARDIAC_MYOCYTE_INTERACTORS.get(gene_upper, [])
+        curated = CARDIAC_MYOCYTE_INTERACTORS.get(gene_upper, [])
+    if curated:
+        return curated
+    # Fallback: fetch from STRING for any gene
+    uid = uniprot_id or GENE_UNIPROT.get(gene_upper) or _resolve_uniprot_id(gene)
+    if uid:
+        return _fetch_string_interactors(uid)
     return []
+
+
+def _fetch_pdb_by_uniprot(uniprot_id: str, limit: int = 10) -> list:
+    """Fetch PDB IDs from RCSB Search API by UniProt ID. Returns list of PDB IDs."""
+    if not uniprot_id or not requests:
+        return []
+    try:
+        import json
+        query = {
+            "query": {
+                "type": "group",
+                "logical_operator": "and",
+                "nodes": [
+                    {"type": "terminal", "service": "text", "parameters": {"operator": "exact_match", "value": uniprot_id, "attribute": "rcsb_polymer_entity_container_identifiers.reference_sequence_identifiers.database_accession"}},
+                    {"type": "terminal", "service": "text", "parameters": {"operator": "exact_match", "value": "UniProt", "attribute": "rcsb_polymer_entity_container_identifiers.reference_sequence_identifiers.database_name"}},
+                ],
+            },
+            "return_type": "entry",
+            "request_options": {"paginate": {"start": 0, "rows": limit}},
+        }
+        r = requests.post("https://search.rcsb.org/rcsbsearch/v2/query", json=query, timeout=15)
+        if not r.ok:
+            return []
+        data = r.json()
+        ids = data.get("result_set", []) or []
+        if not isinstance(ids, list):
+            return []
+        # RCSB returns [{"identifier": "1ABC", ...}, ...]
+        return [x.get("identifier", x) if isinstance(x, dict) else str(x) for x in ids[:limit]]
+    except Exception:
+        return []
 
 
 def get_recommended_pdb(
     gene: str,
     pos: int = None,
     uniprot_seq: str = None,
+    uniprot_id: str = None,
 ) -> dict:
     """
     Returns: {pdb_id, chain, has_residue_coordinates, mapping_method, pdb_ids, pdb_resseq, notes}.
-    When uniprot_seq and pos provided, maps UniProt -> PDB resseq before checking residue presence.
+    Uses PROTEIN_PDB when available; else fetches from RCSB by UniProt ID for any gene.
     """
     pdb_ids = PROTEIN_PDB.get(gene.upper(), [])
+    if not pdb_ids and (uniprot_id or GENE_UNIPROT.get(gene.upper()) or _resolve_uniprot_id(gene)):
+        uid = uniprot_id or GENE_UNIPROT.get(gene.upper()) or _resolve_uniprot_id(gene)
+        pdb_ids = _fetch_pdb_by_uniprot(uid)
     chosen = pdb_ids[0] if pdb_ids else None
     has_res = True
     notes = "OK"

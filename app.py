@@ -109,17 +109,28 @@ with st.sidebar:
     st.header("📥 Input")
     with st.expander("How to use", expanded=False):
         st.markdown("""
-        1. Enter **gene** and **mutation** (e.g. `p.R526H`)
+        1. Enter **any gene** (we look up UniProt) and **mutation** (text: `p.R526H` or simple: position + WT + Mut)
         2. Choose **tissue** and **analysis mode**
         3. Click **Run Pipeline**
-        4. If mutant is missing from AlphaFold DB: use the **Predict here** button (≤400 residues) or follow **Option B** to predict externally.
+        4. Interacting proteins come from STRING for any gene (curated for cardiac when available)
+        5. If mutant is missing: use **Predict here** (≤400 aa) or **Option B**
         """)
-    gene = st.text_input("Gene symbol", value="SCN5A", help="e.g., SCN5A, MYH7, KCNQ1")
-    mutation_input = st.text_input(
-        "Mutation",
-        value="c.1577G>A, p.R526H",
-        help="Formats: c.1577G>A, p.R526H, or R526H",
-    )
+    gene = st.text_input("Gene symbol", value="SCN5A", help="Any gene; we look up UniProt automatically")
+    input_mode = st.radio("Mutation input", ["Text format", "Position + AAs"], horizontal=True, help="Text: p.R526H, R526H, Ser1054Ala. Simple: enter position, WT, Mut separately.")
+    pos_override, wt_override, mut_override = None, None, None
+    mutation_input = ""
+    if input_mode == "Text format":
+        mutation_input = st.text_input("Mutation", value="c.1577G>A, p.R526H", help="p.R526H, R526H, Ser1054Ala, c.1577G>A, or 526 R→H")
+    else:
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            pos_override = st.number_input("Position", min_value=1, value=526, help="Amino acid position in protein")
+        aa_list = list("ARNDCEQGHILKMFPSTWYV")
+        with c2:
+            wt_override = st.selectbox("WT AA", aa_list, index=aa_list.index("R"), help="Wild-type amino acid")
+        with c3:
+            mut_override = st.selectbox("Mutant AA", aa_list, index=aa_list.index("H"), help="Mutant amino acid")
+        mutation_input = f"{pos_override} {wt_override} {mut_override}"
     tissue = st.selectbox(
         "Tissue of interest",
         ["Cardiac myocyte", "Heart", "Skeletal muscle", "Neuron", "Other"],
@@ -133,12 +144,17 @@ with st.sidebar:
     run_button = st.button("🚀 Run Pipeline", type="primary", use_container_width=True)
 
 # Parse mutation (with gene for variant_id)
-parsed = parse_mutation(mutation_input, gene)
+parsed = parse_mutation(
+    mutation_input, gene,
+    position=pos_override if input_mode == "Position + AAs" else None,
+    wt_aa=wt_override if input_mode == "Position + AAs" else None,
+    mut_aa=mut_override if input_mode == "Position + AAs" else None,
+)
 pos = parsed.get("position") or parsed.get("cds_pos")
 wt, mut = parsed.get("wt_aa"), parsed.get("mut_aa")
 
 if not pos and not parsed.get("cds_pos"):
-    st.warning("Could not parse mutation. Use formats: p.R526H, R526H, or c.1577G>A")
+    st.warning("Could not parse mutation. Use p.R526H, R526H, 526 R→H, or Position + AAs.")
     st.stop()
 
 # Resolve UniProt → canonical sequence
@@ -167,8 +183,8 @@ else:
         st.warning("WT/mutant not fully parsed. Use p.R526H format.")
         qc_ok = False
 
-# PDB coverage (with UniProt->PDB mapping when canonical available)
-pdb_rec = get_recommended_pdb(gene, pos, uniprot_seq=canonical_fasta)
+# PDB coverage (with UniProt->PDB mapping when canonical available; fetches from RCSB for any gene)
+pdb_rec = get_recommended_pdb(gene, pos, uniprot_seq=canonical_fasta, uniprot_id=uniprot_id)
 has_res = pdb_rec.get("has_residue_coordinates", True)
 pdb_ids = pdb_rec.get("pdb_ids", [])
 pdb_resseq = pdb_rec.get("pdb_resseq")
@@ -310,7 +326,7 @@ with st.spinner("Running predictions..."):
 
     # Section 4: Tissue-specific PPIs + PPI ΔΔG table
     st.header("4️⃣ Tissue-Specific Protein Interactions & PPI ΔΔG")
-    interactors = get_tissue_interactors(gene, tissue)
+    interactors = get_tissue_interactors(gene, tissue, uniprot_id=uniprot_id)
     if interactors and get_ppi_ddg_predictions and wt and mut and pos:
         ppi_rows = get_ppi_ddg_predictions(gene, wt, mut, pos, interactors, canonical_seq=canonical_fasta)
         df = pd.DataFrame(ppi_rows)
@@ -322,7 +338,7 @@ with st.spinner("Running predictions..."):
             with st.expander(f"**{label}** — {ip.get('role', '')}"):
                 st.write(f"UniProt: {ip.get('uniprot', '')}")
     else:
-        st.info(f"No predefined interactors for {gene} in {tissue}.")
+        st.info(f"No interactors found for {gene} in {tissue}. (STRING API or curated list)")
 
     # Section 5: 3D structure
     st.header("5️⃣ Interactive 3D Structure")
