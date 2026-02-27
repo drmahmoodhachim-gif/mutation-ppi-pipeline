@@ -1,5 +1,15 @@
 """Configuration and tissue-specific data for the mutation pipeline."""
 
+# App banner & author
+APP_AUTHOR = {
+    "name": "Mahmood Al Mashhadani",
+    "title": "Assistant Professor - Molecular Medicine",
+    "affiliation": "MBRU - College of Medicine",
+    "email": "mahmood.almashhadani@dubaihealth.ae",
+    "orcid": "",
+    "repo_url": "https://github.com/drmahmoodhachim-gif/mutation-ppi-pipeline",
+}
+
 # Gene symbol -> UniProt ID mapping (common cardiac/channel genes)
 GENE_UNIPROT = {
     "SCN5A": "Q14524",

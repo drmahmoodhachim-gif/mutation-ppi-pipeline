@@ -7,6 +7,10 @@ import streamlit as st
 import pandas as pd
 from config import GENE_UNIPROT
 try:
+    from config import APP_AUTHOR
+except ImportError:
+    APP_AUTHOR = {}
+try:
     from config import EXAMPLE_VARIANTS
 except ImportError:
     EXAMPLE_VARIANTS = []
@@ -35,16 +39,46 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main-header { font-size: 2rem; font-weight: 700; color: #1E88E5; margin-bottom: 0.5rem; }
-    .sub-header { font-size: 1.1rem; color: #546E7A; margin-bottom: 2rem; }
+    .banner {
+        background: linear-gradient(135deg, #1E88E5 0%, #1565C0 50%, #0D47A1 100%);
+        padding: 1.5rem 1.5rem 1.8rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 12px rgba(30, 136, 229, 0.3);
+    }
+    .banner-title { font-size: 2.2rem; font-weight: 700; color: white; margin: 0; letter-spacing: -0.5px; }
+    .banner-subtitle { font-size: 1rem; color: rgba(255,255,255,0.9); margin: 0.4rem 0 0 0; }
+    .author-box {
+        background: #f8f9fa; border-left: 4px solid #1E88E5;
+        padding: 0.8rem 1rem; border-radius: 0 8px 8px 0;
+        margin-bottom: 1rem; font-size: 0.95rem;
+    }
+    .author-name { font-weight: 600; color: #1565C0; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<p class="main-header">🧬 Mutation PPI Prediction Pipeline</p>', unsafe_allow_html=True)
-st.markdown(
-    '<p class="sub-header">Variant QC → pathogenicity, structural impact, PPI (interface-aware)</p>',
-    unsafe_allow_html=True,
-)
+# Banner
+st.markdown("""
+<div class="banner">
+    <p class="banner-title">🧬 Mutation PPI Prediction Pipeline</p>
+    <p class="banner-subtitle">Variant QC → pathogenicity, structural impact, PPI (interface-aware)</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Welcome & author details
+auth = APP_AUTHOR or {}
+if auth.get("name"):
+    title_part = f" — {auth['title']}" if auth.get("title") else ""
+    aff_part = auth.get("affiliation", "")
+    email_part = f' • <a href="mailto:{auth["email"]}">{auth["email"]}</a>' if auth.get("email") else ""
+    st.markdown(
+        f'<div class="author-box">'
+        f'<strong>Welcome to the tool.</strong><br>'
+        f'Developed by <span class="author-name">{auth["name"]}</span>{title_part}<br>'
+        f'{aff_part}{email_part}'
+        f'</div>',
+        unsafe_allow_html=True
+    )
 
 # Disclaimer — always visible
 st.info(
