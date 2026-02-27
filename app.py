@@ -46,26 +46,11 @@ st.markdown(
 # Sidebar — Input
 with st.sidebar:
     st.header("📥 Input")
-    example_choice = st.selectbox(
-        "Example variant",
-        [""] + [v["label"] for v in EXAMPLE_VARIANTS],
-        index=0,
-        help="Load a pre-filled mutation",
-    )
-    if example_choice:
-        ex = next((v for v in EXAMPLE_VARIANTS if v["label"] == example_choice), None)
-        if ex:
-            _gene, _mut = ex["gene"], ex["mutation"]
-        else:
-            _gene, _mut = "SCN5A", "c.1577G>A, p.R526H"
-    else:
-        _gene, _mut = "SCN5A", "c.1577G>A, p.R526H"
-    gene = st.text_input("Gene symbol", value=_gene, key="gene_in")
+    gene = st.text_input("Gene symbol", value="SCN5A", help="e.g., SCN5A, MYH7, KCNQ1")
     mutation_input = st.text_input(
         "Mutation",
-        value=_mut,
-        key="mut_in",
-        help="Formats: c.1577G>A, p.R526H, p.Ser1054Ala, or R526H",
+        value="c.1577G>A, p.R526H",
+        help="Formats: c.1577G>A, p.R526H, or R526H",
     )
     tissue = st.selectbox(
         "Tissue of interest",
@@ -74,8 +59,8 @@ with st.sidebar:
     )
     run_button = st.button("🚀 Run Pipeline", type="primary", use_container_width=True)
 
-# Parse mutation
-parsed = parse_mutation(mutation_input)
+# Parse mutation (pass gene for variant_id)
+parsed = parse_mutation(mutation_input, gene)
 if not parsed.get("position") and not parsed.get("cds_pos"):
     st.warning("Could not parse mutation. Use formats: p.R526H, R526H, or c.1577G>A")
     st.stop()
@@ -134,15 +119,10 @@ if run_button or st.session_state.get("results_ready"):
         if in_voltage_sensor:
             st.info("Position likely in DII voltage-sensor region — charge changes can severely affect gating.")
 
-        # --- Section 4: Tissue-Specific Protein Interactions & PPI ΔΔG ---
-        st.header("4️⃣ Tissue-Specific Protein Interactions & PPI ΔΔG")
+        # --- Section 4: Tissue-specific PPIs ---
+        st.header("4️⃣ Tissue-Specific Protein Interactions")
         interactors = get_tissue_interactors(gene, tissue)
-        if interactors and wt and mut and pos:
-            ppi_rows = get_ppi_ddg_predictions(gene, wt, mut, pos, interactors)
-            df = pd.DataFrame(ppi_rows)
-            st.dataframe(df, use_container_width=True, hide_index=True)
-            st.caption("ΔΔG is heuristic (charge/hydrophobicity); for interface residues use mCSM-PPI2 for partner-specific predictions.")
-        elif interactors:
+        if interactors:
             for ip in interactors:
                 with st.expander(f"**{ip['partner']}** — {ip['role']}"):
                     st.write(f"UniProt: {ip['uniprot']}")

@@ -52,13 +52,13 @@ PROTEIN_PDB = {
     "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5 cardiac sodium channel
     "KCNQ1": ["6UZZ"],
     "MYH7": ["4DB1"],
-    "VCL": ["1TR2", "1SDR", "1SYQ"],   # Vinculin head domain
+    "VCL": ["1TR2", "1SDR", "1SYQ"],
 }
 
 EXAMPLE_VARIANTS = [
-    {"gene": "SCN5A", "mutation": "c.1577G>A, p.R526H", "label": "SCN5A p.R526H — literature"},
-    {"gene": "SCN5A", "mutation": "c.3160T>G, p.Ser1054Ala", "label": "SCN5A p.Ser1054Ala — cohort"},
-    {"gene": "VCL", "mutation": "c.2507A>G, p.Gln836Arg", "label": "VCL p.Gln836Arg — cohort"},
+    {"gene": "SCN5A", "mutation": "c.1577G>A, p.R526H", "label": "SCN5A p.R526H"},
+    {"gene": "SCN5A", "mutation": "c.3160T>G, p.Ser1054Ala", "label": "SCN5A p.Ser1054Ala"},
+    {"gene": "VCL", "mutation": "c.2507A>G, p.Gln836Arg", "label": "VCL p.Gln836Arg"},
 ]
 
 # AlphaMissense API
