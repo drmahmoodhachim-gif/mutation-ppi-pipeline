@@ -18,23 +18,24 @@ GENE_UNIPROT = {
 }
 
 # Tissue-specific protein interactors for cardiac myocytes
+# partner = symbol for keys (e.g. SCN5A_CALM1); label = display name in UI
 CARDIAC_MYOCYTE_INTERACTORS = {
     "SCN5A": [
-        {"partner": "FGF13", "uniprot": "Q92913", "role": "Late Na+ current regulation, FHF binding"},
-        {"partner": "Calmodulin", "uniprot": "P0DP23", "role": "IQ domain binding, inactivation"},
-        {"partner": "SCN1B", "uniprot": "Q07699", "role": "β1 subunit, trafficking"},
-        {"partner": "SCN2B", "uniprot": "Q9UQ35", "role": "β2 subunit"},
-        {"partner": "SCN3B", "uniprot": "Q9NY72", "role": "β3 subunit"},
-        {"partner": "SCN4B", "uniprot": "Q9H0B8", "role": "β4 subunit"},
+        {"partner": "FGF13", "label": "FGF13", "uniprot": "Q92913", "role": "Late Na+ current regulation, FHF binding"},
+        {"partner": "CALM1", "label": "Calmodulin", "uniprot": "P0DP23", "role": "IQ domain binding, inactivation"},
+        {"partner": "SCN1B", "label": "SCN1B", "uniprot": "Q07699", "role": "β1 subunit, trafficking"},
+        {"partner": "SCN2B", "label": "SCN2B", "uniprot": "Q9UQ35", "role": "β2 subunit"},
+        {"partner": "SCN3B", "label": "SCN3B", "uniprot": "Q9NY72", "role": "β3 subunit"},
+        {"partner": "SCN4B", "label": "SCN4B", "uniprot": "Q9H0B8", "role": "β4 subunit"},
     ],
     "KCNQ1": [
-        {"partner": "KCNE1", "uniprot": "P15382", "role": "MinK, IKs modulation"},
-        {"partner": "Calmodulin", "uniprot": "P0DP23", "role": "Calcium-dependent regulation"},
+        {"partner": "KCNE1", "label": "KCNE1", "uniprot": "P15382", "role": "MinK, IKs modulation"},
+        {"partner": "CALM1", "label": "Calmodulin", "uniprot": "P0DP23", "role": "Calcium-dependent regulation"},
     ],
     "VCL": [
-        {"partner": "Talin", "uniprot": "Q9Y490", "role": "Focal adhesion, actin linkage"},
-        {"partner": "Actin", "uniprot": "P68133", "role": "F-actin binding, cytoskeleton"},
-        {"partner": "α-Catenin", "uniprot": "P35221", "role": "Cadherin adhesion complex"},
+        {"partner": "TLN1", "label": "Talin", "uniprot": "Q9Y490", "role": "Focal adhesion, actin linkage"},
+        {"partner": "ACTB", "label": "Actin", "uniprot": "P68133", "role": "F-actin binding, cytoskeleton"},
+        {"partner": "CTNNA1", "label": "α-Catenin", "uniprot": "P35221", "role": "Cadherin adhesion complex"},
     ],
 }
 

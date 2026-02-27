@@ -1,5 +1,26 @@
 """Structure comparison metrics for WT vs mutant."""
 
+import json
+import os
+from typing import Optional
+
+
+def _extract_plddt(plddt_json_path: str, pos: int, window: int) -> Optional[list]:
+    """Extract pLDDT scores from JSON file path. Returns list for window around pos, or None."""
+    if not plddt_json_path or not os.path.isfile(plddt_json_path):
+        return None
+    try:
+        with open(plddt_json_path, "r") as f:
+            data = json.load(f)
+        scores = data.get("plddt", data.get("confidence", []))
+        if not scores or not isinstance(scores, (list, tuple)):
+            return None
+        start = max(0, pos - 1 - window // 2)
+        end = min(len(scores), pos + window // 2)
+        return list(scores[start:end])
+    except Exception:
+        return None
+
 
 def compute_local_structure_deltas(
     wt_pdb: str,
@@ -8,12 +29,31 @@ def compute_local_structure_deltas(
     window: int = 10,
 ) -> dict:
     """
-    Compute local structure deltas. Returns:
-    delta_mean_plddt_window, wt_mean_plddt_window, mut_mean_plddt_window,
+    Legacy: accepts PDB paths (unused). Use compute_local_structure_deltas_from_af instead.
+    """
+    return {
+        "delta_mean_plddt_window": None,
+        "wt_mean_plddt_window": None,
+        "mut_mean_plddt_window": None,
+        "local_rmsd_window": None,
+        "region_type": "LowConfidence/IDR-like",
+    }
+
+
+def compute_local_structure_deltas_from_af(
+    wt_af: dict,
+    mut_af: dict,
+    pos: int,
+    window: int = 10,
+) -> dict:
+    """
+    Compute local structure deltas from AlphaFold result dicts.
+    wt_af / mut_af must have plddt_path (file path to pLDDT JSON).
+    Returns: delta_mean_plddt_window, wt_mean_plddt_window, mut_mean_plddt_window,
     local_rmsd_window (or None), region_type.
     """
-    wt_plddt = _extract_plddt(wt_pdb, pos, window)
-    mut_plddt = _extract_plddt(mut_pdb, pos, window)
+    wt_plddt = _extract_plddt(wt_af.get("plddt_path"), pos, window)
+    mut_plddt = _extract_plddt(mut_af.get("plddt_path"), pos, window)
     if wt_plddt is None or mut_plddt is None:
         return {
             "delta_mean_plddt_window": None,
@@ -33,19 +73,3 @@ def compute_local_structure_deltas(
         "local_rmsd_window": None,
         "region_type": region,
     }
-
-
-def _extract_plddt(pdb_or_json: str, pos: int, window: int):
-    """Extract pLDDT scores from AlphaFold JSON/PAE or return None."""
-    import json
-    try:
-        if pdb_or_json.strip().startswith("{"):
-            data = json.loads(pdb_or_json)
-            scores = data.get("plddt", data.get("confidence", []))
-            if scores and isinstance(scores, (list, tuple)):
-                start = max(0, pos - 1 - window // 2)
-                end = min(len(scores), pos + window // 2)
-                return list(scores[start:end])
-    except Exception:
-        pass
-    return None

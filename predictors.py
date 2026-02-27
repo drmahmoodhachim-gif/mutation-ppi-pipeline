@@ -77,26 +77,34 @@ def resolve_uniprot(gene: str) -> Optional[dict]:
         r = requests.get(f"https://rest.uniprot.org/uniprotkb/{uid}",
             params={"format": "json", "fields": "accession,protein_name,organism_name,sequence"}, timeout=15)
         if not r.ok:
-            return {"uniprot_id": uid, "canonical_fasta": "", "length": 0, "protein_name": "", "organism": ""}
+            return {"uniprot_id": uid, "canonical_fasta": "", "length": 0, "protein_name": "", "organism": "", "warnings": ["UniProt returned error"]}
         d = r.json()
         seq = d.get("sequence", {}).get("value", "")
         name = d.get("proteinDescription", {}).get("recommendedName", {}).get("fullName", {}).get("value", "") or ""
         org = d.get("organism", {}).get("scientificName", "")
-        return {"uniprot_id": uid, "canonical_fasta": seq, "length": len(seq), "protein_name": name, "organism": org}
+        return {"uniprot_id": uid, "canonical_fasta": seq, "length": len(seq), "protein_name": name, "organism": org, "warnings": []}
     except Exception:
-        return {"uniprot_id": uid, "canonical_fasta": "", "length": 0, "protein_name": "", "organism": ""}
+        return {"uniprot_id": uid, "canonical_fasta": "", "length": 0, "protein_name": "", "organism": "", "warnings": ["UniProt fetch failed"]}
 
 
 def validate_variant_on_canonical_sequence(canonical_fasta: str, wt: str, pos: int) -> dict:
-    """Returns: {wt_from_seq, match, message}"""
-    if not canonical_fasta or not wt or pos is None:
+    """Returns: {wt_from_seq, match, message}. Alias: validate_variant_on_sequence."""
+    return validate_variant_on_sequence(canonical_fasta, wt, pos)
+
+
+def validate_variant_on_sequence(seq: str, wt_aa: str, pos: int) -> dict:
+    """Returns: {wt_from_seq, match, message}. Hard-stop on mismatch recommended."""
+    if not seq or not wt_aa or pos is None:
         return {"wt_from_seq": None, "match": False, "message": "Missing sequence, WT, or position."}
-    if pos < 1 or pos > len(canonical_fasta):
-        return {"wt_from_seq": None, "match": False, "message": f"Position {pos} out of range (1-{len(canonical_fasta)})."}
-    wt_from_seq = canonical_fasta[pos - 1].upper()
-    match = wt_from_seq == wt.upper()
-    msg = "OK" if match else f"WT mismatch: canonical has {wt_from_seq} at {pos}, variant claims {wt}."
-    return {"wt_from_seq": wt_from_seq, "match": match, "message": msg}
+    if pos < 1 or pos > len(seq):
+        return {"wt_from_seq": None, "match": False, "message": f"Position {pos} out of range (1-{len(seq)})."}
+    wt_from_seq = seq[pos - 1].upper()
+    match = wt_from_seq == wt_aa.upper()
+    return {
+        "wt_from_seq": wt_from_seq,
+        "match": match,
+        "message": "OK" if match else f"WT mismatch: input {wt_aa}{pos} but sequence has {wt_from_seq}{pos}",
+    }
 
 
 def get_alphamissense_prediction(gene: str, position: int, wt_aa: str, mut_aa: str) -> dict:
@@ -128,22 +136,40 @@ def get_tissue_interactors(gene: str, tissue: str) -> list:
 
 
 def get_recommended_pdb(gene: str, pos: int = None) -> dict:
-    """Returns: {pdb_id, chain, has_residue_coordinates, mapping_method, pdb_ids, notes}"""
+    """Returns: {pdb_id, chain, has_residue_coordinates, mapping_method, pdb_ids, notes}. Residue-aware per PDB."""
     pdb_ids = PROTEIN_PDB.get(gene.upper(), [])
-    pdb_id = pdb_ids[0] if pdb_ids else None
+    chosen = pdb_ids[0] if pdb_ids else None
     has_res = True
-    notes = ""
+    notes = "OK"
+    mapping_method = "config"
+
     if pos and pdb_ids:
         try:
             from visualization import fetch_pdb, residue_in_pdb
-            pd = fetch_pdb(pdb_ids[0])
-            has_res = bool(pd and residue_in_pdb(pd, pos, "A"))
-            if not has_res:
-                notes = "Residue not in PDB; recommend AlphaFold."
+            found = False
+            for pid in pdb_ids:
+                pd = fetch_pdb(pid)
+                if pd and residue_in_pdb(pd, pos, "A"):
+                    chosen = pid
+                    has_res = True
+                    found = True
+                    break
+            if not found:
+                chosen = pdb_ids[0]
+                has_res = False
+                notes = "Residue not present/resolved in available PDBs; recommend AlphaFold."
         except Exception:
-            notes = "Could not verify residue."
-    return {"pdb_id": pdb_id, "chain": "A", "has_residue_coordinates": has_res,
-            "mapping_method": "config", "pdb_ids": pdb_ids, "notes": notes or "OK"}
+            has_res = False
+            notes = "Could not verify residue in PDBs; recommend AlphaFold or check mapping."
+
+    return {
+        "pdb_id": chosen,
+        "chain": "A",
+        "has_residue_coordinates": has_res if pos else True,
+        "mapping_method": mapping_method,
+        "pdb_ids": pdb_ids,
+        "notes": notes,
+    }
 
 
 def _heuristic_ddg(wt_aa: str, mut_aa: str) -> float:
@@ -156,24 +182,34 @@ def _heuristic_ddg(wt_aa: str, mut_aa: str) -> float:
     return 1.2 if abs(h.get(wt_aa, 0) - h.get(mut_aa, 0)) > 2 else 0.3
 
 
-def get_ppi_ddg_predictions(gene: str, wt_aa: str, mut_aa: str, position: int, interactors: list) -> list:
-    """PPI Delta-Delta-G per partner. NA when no complex or not at interface."""
+def get_ppi_ddg_predictions(
+    gene: str,
+    wt_aa: str,
+    mut_aa: str,
+    position: int,
+    interactors: list,
+    canonical_seq: Optional[str] = None,
+) -> list:
+    """PPI Delta-Delta-G per partner. NA when no complex or not at interface. Uses residue mapping if canonical_seq provided."""
     rows = []
     for ip in interactors:
-        partner, role = ip.get("partner", "?"), ip.get("role", "")
+        partner = ip.get("partner", "?")
+        label = ip.get("label", partner)
+        role = ip.get("role", "")
         key = f"{gene.upper()}_{partner}"
         pdb_id = PPI_PDB_COMPLEXES.get(key) if isinstance(PPI_PDB_COMPLEXES, dict) else None
         if isinstance(pdb_id, dict):
             pdb_id = pdb_id.get("pdb_id")
 
         has_c = bool(pdb_id and isinstance(pdb_id, str) and len(pdb_id) == 4)
-        complex_model = None
         interface_info = None
         ppi_ddg = None
-        method = "Heuristic"
-        conclusion = "NA"
+        method = "NA_no_complex"
+        conclusion = "Neutral/Unclear"
         notes = "No interface model; residue not confirmed at interface."
+        confidence = "—"
         got_pdb = False
+        pdb_resseq = position
 
         if has_c:
             try:
@@ -182,34 +218,75 @@ def get_ppi_ddg_predictions(gene: str, wt_aa: str, mut_aa: str, position: int, i
                 pd = fetch_pdb(str(pdb_id))
                 got_pdb = bool(pd)
                 if pd:
-                    ir = is_residue_at_interface(pd, "A", "B", position, 8.0)
-                    interface_info = ir
-                    if ir.get("is_interface"):
-                        ppi_ddg = round(_heuristic_ddg(wt_aa, mut_aa), 2)
-                        method = "Heuristic"
-                        conclusion = "LikelyDisruptive" if ppi_ddg > 1.0 else ("LikelyStabilizing" if ppi_ddg < -0.5 else "Neutral/Unclear")
-                        notes = "OK"
+                    # Residue mapping: UniProt pos -> PDB resseq
+                    if canonical_seq:
+                        try:
+                            from residue_mapper import map_uniprot_pos_to_pdb_resseq
+                            mapping = map_uniprot_pos_to_pdb_resseq(pd, "A", canonical_seq)
+                            pdb_resseq = mapping.get(position)
+                            if pdb_resseq is None:
+                                method = "NA_no_mapping"
+                                notes = "No reliable residue mapping (UniProt↔PDB)."
+                            else:
+                                ir = is_residue_at_interface(pd, "A", "B", int(pdb_resseq), 8.0)
+                                interface_info = ir
+                                if ir.get("is_interface"):
+                                    ppi_ddg = round(_heuristic_ddg(wt_aa, mut_aa), 2)
+                                    method = "Heuristic_interface_proxy"
+                                    confidence = "Low"
+                                    conclusion = "LikelyDisruptive" if ppi_ddg > 1.0 else ("LikelyStabilizing" if ppi_ddg < -0.5 else "Neutral/Unclear")
+                                    notes = "OK"
+                                else:
+                                    notes = f"Not interface (min_dist={ir.get('min_distance', 0):.1f} A)"
+                        except ImportError:
+                            ir = is_residue_at_interface(pd, "A", "B", position, 8.0)
+                            interface_info = ir
+                            if ir.get("is_interface"):
+                                ppi_ddg = round(_heuristic_ddg(wt_aa, mut_aa), 2)
+                                method = "Heuristic_interface_proxy"
+                                confidence = "Low"
+                                conclusion = "LikelyDisruptive" if ppi_ddg > 1.0 else ("LikelyStabilizing" if ppi_ddg < -0.5 else "Neutral/Unclear")
+                                notes = "OK (no mapping; used UniProt pos)"
+                            else:
+                                notes = f"Not interface (min_dist={ir.get('min_distance', 0):.1f} A)"
                     else:
-                        notes = f"Not interface (min_dist={ir.get('min_distance', 0):.1f} A)"
+                        ir = is_residue_at_interface(pd, "A", "B", position, 8.0)
+                        interface_info = ir
+                        if ir.get("is_interface"):
+                            ppi_ddg = round(_heuristic_ddg(wt_aa, mut_aa), 2)
+                            method = "Heuristic_interface_proxy"
+                            confidence = "Low"
+                            conclusion = "LikelyDisruptive" if ppi_ddg > 1.0 else ("LikelyStabilizing" if ppi_ddg < -0.5 else "Neutral/Unclear")
+                            notes = "OK (no canonical seq for mapping)"
+                        else:
+                            notes = f"Not interface (min_dist={ir.get('min_distance', 0):.1f} A)"
                 else:
                     notes = "Complex model unavailable."
             except Exception:
                 notes = "Complex unavailable."
 
         rows.append({
-            "Interacting protein": partner,
+            "Interacting protein": label,
             "Role": role,
             "Tissue evidence": "Present",
             "Complex model available?": "Y" if (has_c and got_pdb) else "N",
             "Interface residue?": "Y" if (interface_info and interface_info.get("is_interface")) else ("N" if interface_info else "—"),
             "PPI Delta-Delta-G (kcal/mol)": ppi_ddg if ppi_ddg is not None else "NA",
+            "Method": method,
+            "Confidence": confidence,
             "Conclusion": conclusion,
             "Notes": notes,
         })
     return rows
 
 
-def estimate_structural_impact(wt_aa: str, mut_aa: str, position: int, in_voltage_sensor: bool = False) -> dict:
+def estimate_structural_impact(
+    wt_aa: str,
+    mut_aa: str,
+    position: int,
+    in_voltage_sensor: bool = False,
+    af_deltas: Optional[dict] = None,
+) -> dict:
     charge_change = {"R": 1, "K": 1, "D": -1, "E": -1, "H": 0.5}
     hydrophobicity = {"A": 1.8, "R": -4.5, "N": -3.5, "D": -3.5, "C": 2.5, "Q": -3.5,
                      "E": -3.5, "G": -0.4, "H": -3.2, "I": 4.5, "L": 3.8, "K": -3.9,
@@ -219,6 +296,25 @@ def estimate_structural_impact(wt_aa: str, mut_aa: str, position: int, in_voltag
     h_wt, h_mut = hydrophobicity.get(wt_aa, 0), hydrophobicity.get(mut_aa, 0)
     impact = "Low"
     reasons = []
+
+    # AlphaFold evidence augments impact
+    if af_deltas:
+        region = af_deltas.get("region_type", "")
+        if region == "LowConfidence/IDR-like":
+            impact = "Uncertain"
+            reasons.append("Region low-confidence (IDR-like); structural impact uncertain.")
+            return {"impact": impact, "reasons": reasons}
+        delta_plddt = af_deltas.get("delta_mean_plddt_window")
+        if delta_plddt is not None:
+            if delta_plddt <= -10:
+                impact = "High" if impact != "High" else impact
+                reasons.append(f"AlphaFold pLDDT drop: Δ{delta_plddt:.1f}")
+            elif delta_plddt <= -5:
+                if impact == "Low":
+                    impact = "Medium"
+                reasons.append(f"AlphaFold pLDDT drop: Δ{delta_plddt:.1f}")
+
+    # Physicochemical (never claim High from hydrophobicity alone; require charge or AF)
     if abs(c_wt - c_mut) > 0.5:
         impact = "High" if in_voltage_sensor else "Medium"
         reasons.append(f"Charge change: {wt_aa}({c_wt}) -> {mut_aa}({c_mut})")
