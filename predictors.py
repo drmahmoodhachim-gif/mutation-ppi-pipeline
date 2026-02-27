@@ -38,10 +38,7 @@ def parse_mutation(mutation_input: str) -> dict:
         result["position"] = int(aa_match.group(2))
         result["mut_aa"] = aa_match.group(3).upper()
 
-    result["wt"], result["pos"], result["mut"] = result["wt_aa"], result["position"], result["mut_aa"]
-    if result.get("gene") and result.get("wt") and result.get("pos") and result.get("mut"):
-        result["variant_id"] = f"{result['gene']}:{result['wt']}{result['pos']}{result['mut']}"
-
+    # c.1577G>A
     cds_match = re.search(r"[c.]?\s*(\d+)\s*([ACGT])\s*[>]\s*([ACGT])", mutation_input, re.I)
     if cds_match:
         result["cds_pos"] = int(cds_match.group(1))
@@ -107,9 +104,18 @@ def get_tissue_interactors(gene: str, tissue: str) -> list:
     return []
 
 
-def get_recommended_pdb(gene: str) -> list:
-    """Get recommended PDB IDs for structure visualization."""
-    return PROTEIN_PDB.get(gene.upper(), [])
+def get_recommended_pdb(gene: str, pos: int = None) -> dict:
+    """Get recommended PDB. Returns dict with pdb_ids, has_residue_coordinates."""
+    pdb_ids = PROTEIN_PDB.get(gene.upper(), [])
+    has_res = True
+    if pos and pdb_ids:
+        try:
+            from visualization import fetch_pdb, residue_in_pdb
+            pd = fetch_pdb(pdb_ids[0])
+            has_res = bool(pd and residue_in_pdb(pd, pos, "A"))
+        except Exception:
+            pass
+    return {"pdb_ids": pdb_ids, "has_residue_coordinates": has_res}
 
 
 def estimate_structural_impact(wt_aa: str, mut_aa: str, position: int, in_voltage_sensor: bool = False) -> dict:

@@ -5,7 +5,11 @@ Input: gene, mutation, tissue → outputs all predictions + high-res 3D visualiz
 
 import streamlit as st
 import pandas as pd
-from config import GENE_UNIPROT, PROTEIN_PDB, EXAMPLE_VARIANTS
+from config import GENE_UNIPROT, PROTEIN_PDB
+try:
+    from config import EXAMPLE_VARIANTS
+except ImportError:
+    EXAMPLE_VARIANTS = []
 from predictors import (
     parse_mutation,
     get_alphamissense_prediction,
@@ -59,8 +63,8 @@ with st.sidebar:
     )
     run_button = st.button("🚀 Run Pipeline", type="primary", use_container_width=True)
 
-# Parse mutation (pass gene for variant_id)
-parsed = parse_mutation(mutation_input, gene)
+# Parse mutation
+parsed = parse_mutation(mutation_input)
 if not parsed.get("position") and not parsed.get("cds_pos"):
     st.warning("Could not parse mutation. Use formats: p.R526H, R526H, or c.1577G>A")
     st.stop()
