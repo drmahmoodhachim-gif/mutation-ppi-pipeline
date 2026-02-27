@@ -23,6 +23,22 @@ def fetch_pdb(pdb_id: str) -> Optional[str]:
     return None
 
 
+def residue_in_pdb(pdb_data: str, residue_pos: int, chain: str = "A") -> bool:
+    """Check if residue position has coordinates in PDB (resolved vs missing)."""
+    if not pdb_data:
+        return False
+    target = str(residue_pos)
+    for line in pdb_data.split("\n"):
+        if not line.startswith(("ATOM", "HETATM")):
+            continue
+        if len(line) >= 26 and line[21:22].strip() == chain:
+            # PDB residue number: columns 23-26 (1-indexed)
+            resi = line[22:26].strip()
+            if resi == target or (resi.lstrip("-").isdigit() and int(resi.lstrip("-")) == residue_pos):
+                return True
+    return False
+
+
 def _extract_chain(pdb_data: str, chain: str) -> str:
     """Extract only ATOM/HETATM for chain — lighter 3D (Nav1.5 has 4 chains)."""
     out = [l for l in pdb_data.split("\n") if l.startswith(("ATOM", "HETATM")) and len(l) >= 22 and l[21:22].strip() == chain]

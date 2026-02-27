@@ -5,15 +5,7 @@ Input: gene, mutation, tissue → outputs all predictions + high-res 3D visualiz
 
 import streamlit as st
 import pandas as pd
-from config import GENE_UNIPROT, PROTEIN_PDB
-try:
-    from config import EXAMPLE_VARIANTS
-except ImportError:
-    EXAMPLE_VARIANTS = [
-        {"gene": "SCN5A", "mutation": "c.1577G>A, p.R526H", "label": "SCN5A p.R526H — literature (PMID: 24795344)"},
-        {"gene": "SCN5A", "mutation": "c.3160T>G, p.Ser1054Ala", "label": "SCN5A p.Ser1054Ala — cohort"},
-        {"gene": "VCL", "mutation": "c.2507A>G, p.Gln836Arg", "label": "VCL p.Gln836Arg — cohort"},
-    ]
+from config import GENE_UNIPROT, PROTEIN_PDB, EXAMPLE_VARIANTS
 from predictors import (
     parse_mutation,
     get_alphamissense_prediction,
@@ -50,23 +42,14 @@ st.markdown(
     '<p class="sub-header">Predict pathogenicity, structural impact, and protein-protein interactions for missense mutations in tissue context</p>',
     unsafe_allow_html=True,
 )
-st.markdown("**Hi Inna Aleksandrova** · مرحباً إينا ألكساندروفا · Привет, Инна Александрова")
-st.divider()
 
 # Sidebar — Input
 with st.sidebar:
     st.header("📥 Input")
-    example_options = ["Custom (enter below)"] + [v["label"] for v in EXAMPLE_VARIANTS]
-    example_choice = st.selectbox("Example variant", example_options, index=0)
-    if example_choice != "Custom (enter below)":
-        ex = next(v for v in EXAMPLE_VARIANTS if v["label"] == example_choice)
-        gene_default, mutation_default = ex["gene"], ex["mutation"]
-    else:
-        gene_default, mutation_default = "SCN5A", "c.1577G>A, p.R526H"
-    gene = st.text_input("Gene symbol", value=gene_default, help="e.g., SCN5A, MYH7, KCNQ1, VCL")
+    gene = st.text_input("Gene symbol", value="SCN5A", help="e.g., SCN5A, MYH7, KCNQ1")
     mutation_input = st.text_input(
         "Mutation",
-        value=mutation_default,
+        value="c.1577G>A, p.R526H",
         help="Formats: c.1577G>A, p.R526H, or R526H",
     )
     tissue = st.selectbox(
@@ -136,47 +119,13 @@ if run_button or st.session_state.get("results_ready"):
         if in_voltage_sensor:
             st.info("Position likely in DII voltage-sensor region — charge changes can severely affect gating.")
 
-        # --- Section 4: Tissue-specific PPIs + PPI ΔΔG table ---
-        st.header("4️⃣ Tissue-Specific Protein Interactions & PPI ΔΔG")
+        # --- Section 4: Tissue-specific PPIs ---
+        st.header("4️⃣ Tissue-Specific Protein Interactions")
         interactors = get_tissue_interactors(gene, tissue)
-        if interactors and wt and mut and pos:
-            ddg_results = get_ppi_ddg_predictions(gene, interactors, wt, pos, mut)
-            table_data = []
-            for r in ddg_results:
-                ddg = r["mutant_ddg"]
-                conclusion = "Decreased" if ddg < 0 else "Increased" if ddg > 0 else "No change"
-                pathway = "Weaker binding may reduce downstream coupling/signaling" if conclusion == "Decreased" else "Stronger binding may enhance downstream effects" if conclusion == "Increased" else "Similar affinity; minimal pathway impact"
-                role = r.get("role", "").lower()
-                if "na+" in role or "sodium" in role:
-                    pathway = "May alter late Na+ current and excitability"
-                elif "inactivation" in role or "iq" in role:
-                    pathway = "May affect channel inactivation kinetics"
-                elif "trafficking" in role:
-                    pathway = "May impair membrane trafficking"
-                elif "talin" in role or "actin" in role or "focal" in role:
-                    pathway = "May affect focal adhesion dynamics"
-                elif "iks" in role or "modulation" in role:
-                    pathway = "May alter IKs channel modulation"
-                elif "phosphorylation" in role or "kinase" in role or "csnk2a2" in role:
-                    pathway = "May affect kinase-mediated phosphorylation at this site"
-                elif "vasp" in role:
-                    pathway = "May alter VASP-mediated actin dynamics and focal adhesion"
-                table_data.append({
-                    "Interacting protein": r["partner"],
-                    "Role": r["role"],
-                    "Wild-type (ref)": "0",
-                    "Mutant ΔΔG (kcal/mol)": ddg,
-                    "Conclusion": conclusion,
-                    "Pathway effect downstream": pathway,
-                })
-            df = pd.DataFrame(table_data)
-            st.dataframe(df, use_container_width=True, hide_index=True)
-            st.caption("ΔΔG from heuristic (charge/hydrophobicity). Identical values across partners may indicate mutation affects overall stability rather than partner-specific interfaces; use mCSM-PPI2 for interface-specific predictions.")
-        elif interactors:
+        if interactors:
             for ip in interactors:
                 with st.expander(f"**{ip['partner']}** — {ip['role']}"):
                     st.write(f"UniProt: {ip['uniprot']}")
-            st.info("Provide mutation in p.R526H format for ΔΔG table.")
         else:
             st.info(f"No predefined interactors for {gene} in {tissue}. Add to config.CARDIAC_MYOCYTE_INTERACTORS.")
 
@@ -209,7 +158,7 @@ if run_button or st.session_state.get("results_ready"):
             else:
                 st.warning("Could not fetch PDB structure.")
         else:
-            st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB. For disordered regions (e.g. SCN5A ~1054) or custom structures: [AlphaFold DB](https://alphafold.ebi.ac.uk/).")
+            st.info(f"No predefined PDB for {gene}. Add to config.PROTEIN_PDB or use AlphaFold DB.")
 
         # --- Section 6: Next steps / mCSM-PPI2 ---
         st.header("6️⃣ PPI Binding Affinity (mCSM-PPI2)")
