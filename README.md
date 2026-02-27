@@ -23,17 +23,19 @@ Then open the URL (usually http://localhost:8501) in your browser.
 
 ## Deploy live (Streamlit Community Cloud)
 
-1. **Push to GitHub** (see below)
+1. Ensure your code is pushed to GitHub
 2. Go to [share.streamlit.io](https://share.streamlit.io)
 3. Sign in with GitHub
 4. Click **"New app"** → **"Deploy an existing app"**
 5. Set:
-   - **Repository:** `YOUR_USERNAME/mutation-ppi-pipeline`
+   - **Repository:** `drmahmoodhachim-gif/mutation-ppi-pipeline`
    - **Branch:** `main`
    - **Main file path:** `app.py`
 6. Click **Deploy**
 
 Your app will be live at `https://YOUR_APP_NAME.streamlit.app`
+
+*Note: "Predict here" (Option A) works on the deployed app for sequences ≤400 residues. Option B (save files locally) requires running the app locally.*
 
 ## Input formats
 
