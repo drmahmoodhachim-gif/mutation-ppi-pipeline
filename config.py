@@ -52,7 +52,6 @@ PROTEIN_PDB = {
     "SCN5A": ["6UZ3", "6UZ0", "8BEI"],  # Nav1.5; AlphaFold for disordered regions (e.g. ~1054)
     "KCNQ1": ["6UZZ"],
     "MYH7": ["4DB1"],
-    "VCL": ["1TR2", "1SDR", "1SYQ"],  # 1TR2 preferred for linker region
 }
 
 # AlphaMissense API
