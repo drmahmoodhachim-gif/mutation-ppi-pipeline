@@ -252,7 +252,7 @@ def is_local_colabfold_available(colabfold_cmd: str = None) -> bool:
         try:
             img = os.environ.get("COLABFOLD_IMAGE", "ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2")
             proc = subprocess.run(["docker", "images", "-q", img], capture_output=True, timeout=5)
-            return proc.returncode == 0 and len(proc.stdout or b"").strip() > 0
+            return proc.returncode == 0 and len((proc.stdout or b"").strip()) > 0
         except Exception:
             return False
     try:
