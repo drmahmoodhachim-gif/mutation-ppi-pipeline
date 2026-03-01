@@ -1,5 +1,9 @@
 """Configuration and tissue-specific data for the mutation pipeline."""
 
+# Public URL when running locally with ngrok (share this with users)
+# Set to your ngrok URL, e.g. "https://lichenoid-eidetic-keitha.ngrok-free.dev"
+APP_PUBLIC_URL = "https://lichenoid-eidetic-keitha.ngrok-free.dev"
+
 # App banner & author
 APP_AUTHOR = {
     "name": "Mahmood Al Mashhadani",

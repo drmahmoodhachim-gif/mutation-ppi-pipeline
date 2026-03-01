@@ -3,6 +3,9 @@
 import hashlib
 import json
 import os
+import shutil
+import subprocess
+import tempfile
 from typing import Optional
 
 try:
@@ -169,6 +172,94 @@ def predict_via_esm_atlas(sequence: str, out_dir: str) -> Optional[dict]:
         }
     except Exception:
         return None
+
+
+def _find_ranked_pdb(dir_path: str) -> Optional[str]:
+    """Find ranked_0.pdb in ColabFold output (may be in subdirs)."""
+    for root, _, files in os.walk(dir_path):
+        if "ranked_0.pdb" in files:
+            return os.path.join(root, "ranked_0.pdb")
+    return None
+
+
+def predict_via_local_colabfold(sequence: str, out_dir: str, colabfold_cmd: str = None) -> Optional[dict]:
+    """
+    Run ColabFold locally (any length). Requires colabfold_batch or Docker.
+    Set env COLABFOLD_CMD for custom command, or COLABFOLD_DOCKER=1 to use Docker.
+    Returns result dict on success, None on failure.
+    """
+    if not sequence:
+        return None
+    cmd_name = colabfold_cmd or os.environ.get("COLABFOLD_CMD", "colabfold_batch")
+    use_docker = os.environ.get("COLABFOLD_DOCKER", "").lower() in ("1", "true", "yes")
+
+    cache_key = _seq_hash(sequence)
+    cache_dir = os.path.join(out_dir, "cache", cache_key)
+    os.makedirs(cache_dir, exist_ok=True)
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            fasta_path = os.path.join(tmp, "query.fasta")
+            with open(fasta_path, "w") as f:
+                f.write(f">query\n{sequence}\n")
+
+            if use_docker:
+                # Docker: mount tmp to /data, run colabfold_batch inside container
+                img = os.environ.get("COLABFOLD_IMAGE", "ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2")
+                tmp_abs = os.path.abspath(tmp)
+                # Docker -v format: host_path:container_path
+                cmd = [
+                    "docker", "run", "--rm",
+                    "-v", f"{tmp_abs}:/data", "-w", "/data",
+                    img, "colabfold_batch", "/data/query.fasta", "/data",
+                ]
+            else:
+                cmd = [cmd_name, fasta_path, tmp]
+
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, cwd=tmp)
+            if proc.returncode != 0:
+                return None
+
+            pdb_src = _find_ranked_pdb(tmp)
+            if not pdb_src or not os.path.isfile(pdb_src):
+                return None
+
+            pdb_dst = os.path.join(cache_dir, "ranked_0.pdb")
+            shutil.copy2(pdb_src, pdb_dst)
+            per_res = _extract_plddt_from_pdb(pdb_dst)
+            if not per_res:
+                return None
+            mean_plddt = float(sum(per_res) / len(per_res))
+            plddt_path = os.path.join(cache_dir, "plddt.json")
+            with open(plddt_path, "w") as f:
+                json.dump({"plddt": per_res}, f)
+
+            return {
+                "status": "cached",
+                "pdb_path": pdb_dst,
+                "plddt_path": plddt_path,
+                "mean_plddt": mean_plddt,
+                "per_res_plddt": per_res,
+            }
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        return None
+
+
+def is_local_colabfold_available(colabfold_cmd: str = None) -> bool:
+    """Check if ColabFold is available (colabfold_batch or Docker)."""
+    cmd = colabfold_cmd or os.environ.get("COLABFOLD_CMD", "colabfold_batch")
+    if os.environ.get("COLABFOLD_DOCKER", "").lower() in ("1", "true", "yes"):
+        try:
+            img = os.environ.get("COLABFOLD_IMAGE", "ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2")
+            proc = subprocess.run(["docker", "images", "-q", img], capture_output=True, timeout=5)
+            return proc.returncode == 0 and len(proc.stdout or b"").strip() > 0
+        except Exception:
+            return False
+    try:
+        proc = subprocess.run([cmd, "--help"], capture_output=True, timeout=5)
+        return proc.returncode == 0 or b"colabfold" in (proc.stdout or proc.stderr or b"").lower()
+    except Exception:
+        return False
 
 
 def run_alphafold_single(

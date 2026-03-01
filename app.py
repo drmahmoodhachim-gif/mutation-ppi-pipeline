@@ -11,6 +11,10 @@ try:
 except ImportError:
     APP_AUTHOR = {}
 try:
+    from config import APP_PUBLIC_URL
+except ImportError:
+    APP_PUBLIC_URL = ""
+try:
     from config import EXAMPLE_VARIANTS
 except ImportError:
     EXAMPLE_VARIANTS = []
@@ -80,6 +84,12 @@ if auth.get("name"):
         unsafe_allow_html=True
     )
 
+# Public access URL (when running locally with ngrok)
+if APP_PUBLIC_URL:
+    st.success(
+        f"**Share with users:** [Open this app →]({APP_PUBLIC_URL}) — predictions run on this server."
+    )
+
 # Disclaimer — always visible
 st.info(
     "**Disclaimer:** For research and educational use only. Not medical advice. Predictions are theoretical models. "
@@ -103,6 +113,51 @@ with st.expander("📋 Data Sources, Attributions & Legal", expanded=True):
     | [mCSM-PPI2](https://biosig.lab.uq.edu.au/mcsm_ppi2/) | PPI ΔΔG predictions (external link) | [Rodrigues et al., NAR 2019](https://doi.org/10.1093/nar/gkz383) |
     """)
     st.caption("Property and intellectual rights remain with the respective data providers. Users must comply with each source's terms when publishing or redistributing results.")
+
+# How to run this app locally and share with users
+with st.expander("🖥 Run this app on your laptop & share with users", expanded=False):
+    st.markdown("""
+    **Goal:** Run the app on your laptop so users can submit requests and predictions run on your machine.
+
+    ### Step 1: Install ColabFold (Docker)
+
+    ```bash
+    docker pull ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2
+    ```
+
+    ### Step 2: Run the Streamlit app
+
+    ```bash
+    cd mutation-ppi-pipeline
+    pip install -r requirements.txt
+    $env:COLABFOLD_DOCKER="1"    # Windows PowerShell
+    streamlit run app.py --server.port 8501
+    ```
+
+    *(On Linux/Mac use `export COLABFOLD_DOCKER=1` instead of the `$env:` line.)*
+
+    ### Step 3: Expose with ngrok
+
+    1. Sign up (free): [dashboard.ngrok.com/signup](https://dashboard.ngrok.com/signup)
+    2. Get your authtoken: [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
+    3. Add authtoken (one-time): `ngrok config add-authtoken YOUR_TOKEN`
+    4. Run: `ngrok http 8501`
+
+    ### Step 4: Share the URL
+
+    ngrok will show a URL like `https://xxxx.ngrok-free.dev`. Share it with users — they can submit mutations and use **Predict on this server** (local ColabFold) for any protein length.
+
+    ### Summary
+
+    | Step | Command |
+    |------|---------|
+    | 1 | `docker pull ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2` |
+    | 2 | `$env:COLABFOLD_DOCKER="1"; streamlit run app.py --server.port 8501` |
+    | 3 | `ngrok config add-authtoken TOKEN` then `ngrok http 8501` |
+    | 4 | Share the ngrok URL with users |
+
+    See `RUN_LOCAL.md` in the project for full details.
+    """)
 
 # Sidebar — Input
 with st.sidebar:
@@ -249,30 +304,44 @@ with st.spinner("Running predictions..."):
                     st.metric("WT pLDDT at site", round(plddt_arr[pos - 1], 1), help="Per-residue confidence at mutation site")
 
                 mut_seq = canonical_fasta[: pos - 1] + mut + canonical_fasta[pos:]
-                from alphafold_runner import _seq_hash, predict_via_esm_atlas
+                from alphafold_runner import _seq_hash, predict_via_esm_atlas, predict_via_local_colabfold, is_local_colabfold_available
                 import os
                 out_dir = os.path.join(os.path.dirname(__file__), "alphafold_out")
                 mut_hash = _seq_hash(mut_seq)
                 cache_dir = os.path.join(out_dir, "cache", mut_hash)
                 esm_limit = 400
+                colabfold_ok = is_local_colabfold_available()
 
                 with st.expander("📌 How to get mutant structure (ΔpLDDT)", expanded=True):
-                    st.markdown("#### **Option A: Predict here** *(sequences ≤400 residues only)*")
-                    st.caption("Click the button below. No sign-up. Uses ESM Atlas API; takes ~30–90 seconds.")
+                    if colabfold_ok:
+                        st.markdown("#### **Option A: Predict on this server** *(any length — runs ColabFold on this machine)*")
+                        st.caption("Predictions run locally on this laptop/server. Takes several minutes for long proteins.")
+                        if st.button("▶ Predict mutant structure now (local ColabFold)", type="primary", key="predict_mut_local"):
+                            with st.spinner("Running ColabFold locally (may take 5–30 min for long proteins)…"):
+                                res = predict_via_local_colabfold(mut_seq, out_dir)
+                            if res:
+                                st.success("Done. Reloading…")
+                                st.rerun()
+                            else:
+                                st.error("Local prediction failed. Check ColabFold is installed and GPU available.")
+                        st.markdown("---")
+
+                    st.markdown("#### **Option B: Predict here (cloud)** *(≤400 residues only)*")
+                    st.caption("Uses ESM Atlas API. No sign-up. ~30–90 seconds.")
                     if len(mut_seq) <= esm_limit:
-                        if st.button("▶ Predict mutant structure now", type="primary", key="predict_mut_esm"):
-                            with st.spinner("Predicting structure via ESM Atlas (30–90 seconds)…"):
+                        if st.button("▶ Predict via ESM Atlas (cloud)", key="predict_mut_esm"):
+                            with st.spinner("Predicting via ESM Atlas (30–90 seconds)…"):
                                 res = predict_via_esm_atlas(mut_seq, out_dir)
                             if res:
                                 st.success("Done. Reloading…")
                                 st.rerun()
                             else:
-                                st.error("Prediction failed. Use Option B below.")
+                                st.error("Prediction failed. Use another option.")
                     else:
-                        st.warning(f"Your protein is {len(mut_seq)} residues. Option A supports up to 400. Use Option B.")
+                        st.warning(f"Sequence is {len(mut_seq)} residues. Option B supports ≤400. Use Option A (local) or C.")
 
                     st.markdown("---")
-                    st.markdown("#### **Option B: Use an external tool** *(any length)*")
+                    st.markdown("#### **Option C: Use an external tool** *(any length)*")
                     st.markdown("**Step 1 — Download mutant sequence**")
                     fasta_content = f">mutant_{gene}_{wt}{pos}{mut}\n{mut_seq}"
                     st.download_button(
@@ -294,7 +363,7 @@ with st.spinner("Running predictions..."):
                     | Robetta | [robetta.bakerlab.org](https://robetta.bakerlab.org) |
                     """)
                     st.markdown("**Step 3 — Save outputs locally**")
-                    st.markdown("Place these two files in the folder below *(only works when running the app locally, not on Streamlit Cloud)*:")
+                    st.markdown("Place these two files in the folder below:")
                     st.code(cache_dir, language=None)
                     st.markdown("""
                     | File | What to save |
