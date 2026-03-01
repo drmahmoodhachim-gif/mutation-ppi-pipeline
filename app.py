@@ -84,20 +84,14 @@ if auth.get("name"):
         unsafe_allow_html=True
     )
 
-# Public access URL (when running locally with ngrok)
-if APP_PUBLIC_URL:
-    st.success(
-        f"**Share with users:** [Open this app →]({APP_PUBLIC_URL}) — predictions run on this server."
-    )
-
 # Disclaimer — always visible
 st.info(
     "**Disclaimer:** For research and educational use only. Not medical advice. Predictions are theoretical models. "
     "Do not use as a substitute for professional medical advice, diagnosis, or treatment."
 )
 
-# Data sources, attributions & legal — expanded by default so users see it
-with st.expander("📋 Data Sources, Attributions & Legal", expanded=True):
+# Data sources, attributions & legal
+with st.expander("📋 Data Sources, Attributions & Legal", expanded=False):
     st.markdown("""
     **Disclaimer:** This tool is for research and educational use only. Predictions are theoretical models and do not constitute medical or clinical advice. Do not use as a substitute for professional medical advice, diagnosis, or treatment.
 
@@ -114,54 +108,18 @@ with st.expander("📋 Data Sources, Attributions & Legal", expanded=True):
     """)
     st.caption("Property and intellectual rights remain with the respective data providers. Users must comply with each source's terms when publishing or redistributing results.")
 
-# How to run this app locally and share with users
-with st.expander("🖥 Run this app on your laptop & share with users", expanded=False):
-    st.markdown("""
-    **Goal:** Run the app on your laptop so users can submit requests and predictions run on your machine.
-
-    ### Step 1: Install ColabFold (Docker)
-
-    ```bash
-    docker pull ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2
-    ```
-
-    ### Step 2: Run the Streamlit app
-
-    ```bash
-    cd mutation-ppi-pipeline
-    pip install -r requirements.txt
-    $env:COLABFOLD_DOCKER="1"    # Windows PowerShell
-    streamlit run app.py --server.port 8501
-    ```
-
-    *(On Linux/Mac use `export COLABFOLD_DOCKER=1` instead of the `$env:` line.)*
-
-    ### Step 3: Expose with ngrok
-
-    1. Sign up (free): [dashboard.ngrok.com/signup](https://dashboard.ngrok.com/signup)
-    2. Get your authtoken: [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
-    3. Add authtoken (one-time): `ngrok config add-authtoken YOUR_TOKEN`
-    4. Run: `ngrok http 8501`
-
-    ### Step 4: Share the URL
-
-    ngrok will show a URL like `https://xxxx.ngrok-free.dev`. Share it with users — they can submit mutations and use **Predict on this server** (local ColabFold) for any protein length.
-
-    ### Summary
-
-    | Step | Command |
-    |------|---------|
-    | 1 | `docker pull ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2` |
-    | 2 | `$env:COLABFOLD_DOCKER="1"; streamlit run app.py --server.port 8501` |
-    | 3 | `ngrok config add-authtoken TOKEN` then `ngrok http 8501` |
-    | 4 | Share the ngrok URL with users |
-
-    See `RUN_LOCAL.md` in the project for full details.
-    """)
-
 # Sidebar — Input
 with st.sidebar:
     st.header("📥 Input")
+    with st.expander("👤 For server admin (you)", expanded=False):
+        if APP_PUBLIC_URL:
+            st.markdown(f"**Share link:** [{APP_PUBLIC_URL}]({APP_PUBLIC_URL})")
+        st.markdown("""
+        **Run on your laptop:** `docker pull ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2`  
+        Then: `$env:COLABFOLD_DOCKER="1"; streamlit run app.py --server.port 8501`  
+        Then: `ngrok http 8501`  
+        See RUN_LOCAL.md for full steps.
+        """)
     with st.expander("How to use", expanded=False):
         st.markdown("""
         1. Enter **any gene** (we look up UniProt) and **mutation** (text: `p.R526H` or simple: position + WT + Mut)
