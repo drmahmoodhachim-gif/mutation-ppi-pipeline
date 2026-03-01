@@ -58,7 +58,7 @@ pip install -r requirements.txt
 # Windows: $env:COLABFOLD_DOCKER="1"
 # Linux/Mac: export COLABFOLD_DOCKER=1
 
-streamlit run app.py --server.port 8501
+python -m streamlit run app.py --server.port 8501
 ```
 
 The app will be available at **http://localhost:8501** on your machine.
@@ -100,7 +100,7 @@ You’ll get a URL like `https://xxxx.ngrok-free.dev`. **Share this URL with use
 | Step | Command / Action |
 |------|------------------|
 | 1 | Install ColabFold (Docker or conda) |
-| 2 | `streamlit run app.py --server.port 8501` |
+| 2 | `python -m streamlit run app.py --server.port 8501` |
 | 3 | `ngrok http 8501` |
 | 4 | Share the ngrok URL with users |
 

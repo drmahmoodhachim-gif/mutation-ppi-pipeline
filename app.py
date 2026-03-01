@@ -115,9 +115,11 @@ with st.sidebar:
         if APP_PUBLIC_URL:
             st.markdown(f"**Share link:** [{APP_PUBLIC_URL}]({APP_PUBLIC_URL})")
         st.markdown("""
-        **Run on your laptop:** `docker pull ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2`  
-        Then: `$env:COLABFOLD_DOCKER="1"; streamlit run app.py --server.port 8501`  
-        Then: `ngrok http 8501`  
+        **Run on your laptop:**
+        1. `docker pull ghcr.io/sokrypton/colabfold:1.5.3-cuda12.2.2`
+        2. `$env:COLABFOLD_DOCKER="1"; python -m streamlit run app.py --server.port 8501`
+        3. `ngrok http 8501`
+
         See RUN_LOCAL.md for full steps.
         """)
     with st.expander("How to use", expanded=False):
