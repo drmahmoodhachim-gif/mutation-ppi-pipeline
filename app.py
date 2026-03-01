@@ -273,18 +273,20 @@ with st.spinner("Running predictions..."):
                 colabfold_ok = is_local_colabfold_available()
 
                 with st.expander("📌 How to get mutant structure (ΔpLDDT)", expanded=True):
+                    st.markdown("#### **Option A: Predict on this server** *(any length — runs on the shared laptop/server)*")
+                    st.caption("Predictions run on the server hosting this app (your laptop). Takes 5–30 min for long proteins.")
                     if colabfold_ok:
-                        st.markdown("#### **Option A: Predict on this server** *(any length — runs ColabFold on this machine)*")
-                        st.caption("Predictions run locally on this laptop/server. Takes several minutes for long proteins.")
-                        if st.button("▶ Predict mutant structure now (local ColabFold)", type="primary", key="predict_mut_local"):
-                            with st.spinner("Running ColabFold locally (may take 5–30 min for long proteins)…"):
+                        if st.button("▶ Predict mutant structure now", type="primary", key="predict_mut_local"):
+                            with st.spinner("Running ColabFold on server (may take 5–30 min for long proteins)…"):
                                 res = predict_via_local_colabfold(mut_seq, out_dir)
                             if res:
                                 st.success("Done. Reloading…")
                                 st.rerun()
                             else:
-                                st.error("Local prediction failed. Check ColabFold is installed and GPU available.")
-                        st.markdown("---")
+                                st.error("Prediction failed. Check ColabFold/Docker on the server.")
+                    else:
+                        st.warning("Server not ready for local prediction. **Admin:** ensure Docker + ColabFold image, then restart with `$env:COLABFOLD_DOCKER=\"1\"`")
+                    st.markdown("---")
 
                     st.markdown("#### **Option B: Predict here (cloud)** *(≤400 residues only)*")
                     st.caption("Uses ESM Atlas API. No sign-up. ~30–90 seconds.")
